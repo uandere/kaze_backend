@@ -8,6 +8,7 @@ use clap::Parser;
 use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::info;
 
 use crate::utils::shutdown::graceful_shutdown;
 
@@ -47,6 +48,8 @@ pub fn run(
         // graceful shutdown
         let shutdown_handle = Handle::new();
         tokio::spawn(graceful_shutdown(shutdown_handle.clone()));
+
+        info!("Starting the server...");
 
         axum_server::from_tcp(listener)
             .handle(shutdown_handle)
