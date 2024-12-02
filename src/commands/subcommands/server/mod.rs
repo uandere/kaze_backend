@@ -25,6 +25,10 @@ pub fn run(
 ) {
     let runtime = Runtime::new().unwrap();
 
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    // use that subscriber to process traces emitted after this point
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port))).unwrap();
 
