@@ -1,0 +1,27 @@
+server {
+    listen 443 ssl;
+    server_name kazeapi.uk www.kazeapi.uk;
+
+    ssl_certificate /etc/letsencrypt/live/kazeapi.uk/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kazeapi.uk/privkey.pem;
+
+    ssl_protocols TLSv1.2;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+server {
+    listen 80;
+    server_name kazeapi.uk www.kazeapi.uk;
+
+    return 301 https://$host$request_uri;
+}

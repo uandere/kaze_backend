@@ -15,6 +15,6 @@ pub struct DiiaResponse {
 
 pub async fn diia(
     State(_state): State<ServerState>,
-    _payload: Json<DiiaPayload>) -> Json<DiiaResponse> {
+) -> Json<DiiaResponse> {
     Json(DiiaResponse { success: true })
 }

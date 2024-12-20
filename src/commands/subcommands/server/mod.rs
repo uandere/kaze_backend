@@ -46,7 +46,7 @@ pub fn run(
         let app = Router::new()
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route("/documents/generate", get(crate::routes::generate::generate))
-            .route("/diia", get(crate::routes::generate::generate))
+            .route("/diia", get(crate::routes::diia::diia))
             .layer(cors)
             .with_state(server_state);
 
