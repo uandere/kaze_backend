@@ -1,4 +1,5 @@
 use axum_server::Handle;
+use tracing::info;
 use std::time::Duration;
 use tokio::signal;
 use tokio::time::sleep;
@@ -25,8 +26,8 @@ pub async fn graceful_shutdown(handle: Handle) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => println!("received Ctrl+C signal"),
-        _ = terminate => println!("received terminate signal"),
+        _ = ctrl_c => info!("received Ctrl+C signal"),
+        _ = terminate => info!("received terminate signal"),
     }
 
     println!("sending graceful shutdown signal");
@@ -37,6 +38,6 @@ pub async fn graceful_shutdown(handle: Handle) {
     loop {
         sleep(Duration::from_secs(1)).await;
 
-        println!("alive connections: {}", handle.connection_count());
+        info!("alive connections: {}", handle.connection_count());
     }
 }
