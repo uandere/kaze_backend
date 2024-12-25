@@ -10,12 +10,7 @@ use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use crate::utils::secrets::get_secret;
 use crate::utils::shutdown::graceful_shutdown;
-
-pub mod error;
-
-pub mod result;
 
 /// A function that starts the server.
 /// For now, we can configure the port to run on.
@@ -46,8 +41,6 @@ pub fn run(
         let server_state = ServerState {
             aws_sm_client
         };
-
-        info!("Getting the secret 'test/Alchemy': {:?}", get_secret(&server_state.aws_sm_client, "test/Alchemy").await);
 
 
         let cors = CorsLayer::new()
