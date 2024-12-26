@@ -403,7 +403,146 @@
   )
 ]
 
+#let appendix_one(
+  appendix_one_data: dictionary,
+  meter_readings: dictionary
+) = [
+  #set heading(
+    numbering: none,
+  )
 
+  #pagebreak()
+
+  #align(right)[
+    Додаток №1 #linebreak()
+    До Договору найму (оренди) нерухомого майна #linebreak()
+    від #appendix_one_data.starting_date.display()
+  ]
+
+  = AКТ
+  = Прийому-передачі житлового приміщення
+
+  #linebreak()
+
+  #grid(
+    columns: (1fr, 1fr),
+    align: (left, right),
+    [#appendix_one_data.place],
+    [#appendix_one_data.starting_date.display()]
+  )
+
+  Даний акт складено у виконання пунктів Договору найму
+  (оренди) нерухомого майна від #appendix_one_data.starting_date.display(),
+  укладеного між *Орендодавцем (ПІБ: #appendix_one_data.landlord_initials)*,
+  та *Орендарем (ПІБ: #appendix_one_data.tenant_initials)*.
+
+  Ми, що нижче підписалися, Орендодавець, з одного боку, і Орендар, з іншого боку, склали цей акт про те, що відповідно зазначеного вище Договору Орендодавець передав, а Орендар прийняв у тимчасове оплатне користування (оренду) нерухоме майно (далі Об’єкт нерухомості) з усіма невід’ємними технічними пристроями і з предметами домашньої обстановки (далі Майно):
+  *#for (key, value) in appendix_one_data.additional_property {
+    [- #key: #value шт.]
+  }*
+
+  Об’єкт нерухомості та Майно в ньому, передані Орендарю в придатному для використання за призначенням стані. Орендар зобов’язується забезпечити збереження та повернути Орендодавцеві Об’єкт нерухомості та Майно в ньому, у належному стані, з урахуванням нормального фізичного зносу і амортизації.
+
+  #let electricity_cr = {
+    if appendix_one_data.meter_readings.electricity.type == "SingleRate" {
+      [
+        #appendix_one_data.meter_readings.electricity.readings.at(0)\;
+      ]
+    } else if appendix_one_data.meter_readings.electricity.type == "DualRate" {
+      [
+        День: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
+        Ніч: #appendix_one_data.meter_readings.electricity.readings.at(1)
+      ] 
+    } else {
+      [
+        Пік: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
+        Полупік: #appendix_one_data.meter_readings.electricity.readings.at(1)\;
+        Ніч: #appendix_one_data.meter_readings.electricity.readings.at(1)
+      ] 
+    }
+  }
+
+  Показник лічильника електроенергії: #electricity_cr (кВт \u{00D7} год#super[3]) #linebreak()
+  #if appendix_one_data.meter_readings.water.type == "SingleRate" {
+    [
+      Показник лічильника води: #appendix_one_data.meter_readings.water.readings.at(0) (м#super[3])
+    ]
+  } else {
+    [
+      Показник лічильника гарячої води: #appendix_one_data.meter_readings.water.readings.at(0) (м#super[3]) #linebreak()
+      Показник лічильника холодної води: #appendix_one_data.meter_readings.water.readings.at(1) (м#super[3])
+    ]
+  }#linebreak()
+  Показник лічильника опалення: #appendix_one_data.meter_readings.heating.readings (Гкал) #linebreak()
+  Показник лічильника газу: #appendix_one_data.meter_readings.gas.readings (м#super[3])
+
+  #align(center)[*Підписи сторін*]
+
+    #grid(
+    columns: (1fr, 1fr),
+    align: (left, right),
+    [
+      *Орендодавець* #linebreak()
+      #appendix_one_data.landlord_initials \_\_\_\_\_\_\_\_\_\_
+    ],
+    [
+      *Орендар* #linebreak()
+      #appendix_one_data.tenant_initials \_\_\_\_\_\_\_\_\_\_
+    ],
+  )
+]
+
+#let appendix_two(
+  appendix_two_data: dictionary
+) = [
+  #set heading(
+    numbering: none,
+  )
+
+  #pagebreak()
+
+  #align(right)[
+    Додаток №2 #linebreak()
+    До Договору найму (оренди) нерухомого майна #linebreak()
+    від #appendix_two_data.starting_date.display()
+  ]
+
+  = AКТ
+  = Прийому-передачі житлового приміщення
+
+  #linebreak()
+
+  #grid(
+    columns: (1fr, 1fr),
+    align: (left, right),
+    [#appendix_two_data.place],
+    [#appendix_two_data.starting_date.display()]
+  )
+
+  Даний акт складено у виконання пунктів Договору найму
+  (оренди) нерухомого майна від #appendix_two_data.starting_date.display(),
+  укладеного між *Орендодавцем (ПІБ: #appendix_two_data.landlord_initials)*,
+  та *Орендарем (ПІБ: #appendix_two_data.tenant_initials)*.
+
+  Ми, що нижче підписалися, *Орендодавець*, з одного боку, і *Орендар*, з іншого боку, склали цей акт про те, що відповідно до зазначеного вище Договором, Орендар передав, а Орендодавець прийняв нерухоме майно (Об’єкт нерухомості) з усіма невід’ємними технічними пристроями і з предметами домашньої обстановки (Майно) в повній цілості і в належному стані, з урахуванням нормального фізичного зносу і амортизації.
+
+  Підписання Сторонами даного Акту про здачу житлового приміщення підтверджує закінчення фактичного використання Об’єкту нерухомості Орендарем. Підписанням даного Акту про здачу житлового приміщення підтверджується відсутність взаємних претензій і виконання Сторонами своїх зобов’язань за цим Договором.
+
+  #align(center)[*Підписи сторін*]
+
+    #grid(
+    columns: (1fr, 1fr),
+    align: (left, right),
+    [
+      *Орендодавець* #linebreak()
+      #appendix_two_data.landlord_initials \_\_\_\_\_\_\_\_\_\_
+    ],
+    [
+      *Орендар* #linebreak()
+      #appendix_two_data.tenant_initials \_\_\_\_\_\_\_\_\_\_
+    ],
+  )
+]
 //////////////////////////////////////////////////
 //                     BODY                     //
 //////////////////////////////////////////////////
@@ -412,7 +551,8 @@
 )
  
 #rental_agreement_place_and_date(
-  place: "Львів"
+  place: "Львів",
+  date: datetime(day: 19, month: 11, year: 2024),
 )
  
 #sides_of_agreement(
@@ -508,5 +648,45 @@
     ),
     phone_number: "0663265785",
     email: "vasylskira@gmail.com"
+  )
+)
+
+#appendix_one(
+  appendix_one_data: (
+    starting_date: datetime(day: 19, month: 11, year: 2024),
+    place: "Львів",
+    tenant_initials: "Демчук Назар Ігорович",
+    landlord_initials: "Скіра Володимир Васильович",
+    additional_property: (
+      "Пральна машинка (Philips Wash 2015)": 1,
+      "Кондиціонер (AERO 2020)": 2,
+    ),
+    meter_readings: (
+      electricity: (
+        type: "TripleRate",
+        readings: (10, 20, 30),
+      ),
+      water: (
+        type: "DualRate",
+        readings: (100, 200),
+      ),
+      heating: (
+        type: "SingleRate",
+        readings: (10)
+      ),
+      gas: (
+        type: "SingleRate",
+        readings: (10)
+      )
+    )
+  )
+)
+
+#appendix_two(
+  appendix_two_data: (
+    starting_date: datetime(day: 19, month: 11, year: 2024),
+    place: "Львів",
+    tenant_initials: "Демчук Назар Ігорович",
+    landlord_initials: "Скіра Володимир Васильович",
   )
 )
