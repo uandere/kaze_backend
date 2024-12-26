@@ -346,7 +346,7 @@
   + Сторонам відомо, що відповідно до Указу Президента України №64/2022 від 24.02.2022 року «Про введення воєнного стану в Україні», у зв’язку з військовою агресією Російської Федерації проти України запроваджено воєнний стан на всій території України. Сторони погоджуються, що запровадження воєнного стану відбулось до підписання Сторонами цього Договору тане впливає в майбутньому на виконання ними своїх зобов’язань.
 ]
 
-#let signatures() = [
+#let signatures(tenant: dictionary, landlord: dictionary) = [
   #pagebreak()
   #heading(numbering: none)[Підписи сторін]
 
@@ -359,15 +359,20 @@
       *Орендодавець* #linebreak()
     ],
     [
-      *Паспорт громадянина України*: Серія: -; Номер: 4323424322; виданий: 3344
+      *Паспорт громадянина України*: Серія: #landlord.passport_data.series; Номер: #landlord.passport_data.number; виданий: #landlord.passport_data.issuing_authority
 
-      *Aдресa*: Україна, Волинська обл., м. Луцьк, Луцький р-н, с. Городище, вул. Дружби, 63
+      *Aдресa*: #landlord.address_of_residence
       
-      *Телефон*: 0963211626
+      *Телефон*: #landlord.phone_number
       
-      *Email*: nazar.demchvk\@gmail.com
-      
-      *Демчук Назар Ігорович* \_\_\_\_\_\_\_\_\_\_ (Підпис)
+      *Email*: #landlord.email #linebreak()
+
+      #grid(
+        columns: (1fr, 1fr),
+        align: (left, right),
+        [*#landlord.initials*],
+        [*\_\_\_\_\_\_\_\_\_\_ (Підпис)*]
+      )
     ],
   )
 
@@ -380,15 +385,20 @@
       *Орендар* #linebreak()
     ],
     [
-      *Паспорт громадянина України*: Серія: -; Номер: 4323424322; виданий: 3344
+      *Паспорт громадянина України*: Серія: #tenant.passport_data.series; Номер: #tenant.passport_data.number; виданий: #tenant.passport_data.issuing_authority
 
-      *Aдресa*: Україна, Волинська обл., м. Луцьк, Луцький р-н, с. Городище, вул. Дружби, 63
+      *Aдресa*: #tenant.address_of_residence
       
-      *Телефон*: 0963211626
+      *Телефон*: #tenant.phone_number
       
-      *Email*: nazar.demchvk\@gmail.com
-      
-      *Демчук Назар Ігорович* \_\_\_\_\_\_\_\_\_\_ (Підпис)
+      *Email*: #tenant.email
+
+            #grid(
+        columns: (1fr, 1fr),
+        align: (left, right),
+        [*#tenant.initials*],
+        [*\_\_\_\_\_\_\_\_\_\_ (Підпис)*]
+      )
     ],
   )
 ]
@@ -476,4 +486,27 @@
   )
 )
 
-#signatures()
+#signatures(
+  tenant: (
+    initials: "Демчук Назар Ігорович",
+    address_of_residence: "Україна, Волинська обл., м. Луцьк, Луцький р-н, с. Городище, вул. Дружби, 63",
+    passport_data: (
+      series: "-",
+      number: "4323424322",
+      issuing_authority: "3344",
+    ),
+    phone_number: "0963211626",
+    email: "nazar.demchvk@gmail.com"
+  ),
+  landlord: (
+    initials: "Скіра Володимир Васильович",
+    address_of_residence: "Україна, Волинська обл., м. Луцьк, Луцький р-н, с. Городище, вул. Дружби, 63",
+    passport_data: (
+      series: "-",
+      number: "5489939439",
+      issuing_authority: "8754",
+    ),
+    phone_number: "0663265785",
+    email: "vasylskira@gmail.com"
+  )
+)
