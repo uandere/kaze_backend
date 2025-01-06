@@ -1,0 +1,26 @@
+{
+    "name": "Kaze Ukraine",
+    "email": "kazerealty.inc@gmail.com",
+    "region": "Львівська",
+    "district": "Львівський",
+    "location": "Львів",
+    "street": "Пимоненка",
+    "house": "7к",
+    "deliveryTypes": [
+        "api"
+    ],
+    "offerRequestType": "dynamic",
+    "scopes": {
+        "sharing": [
+            "passport",
+            "internal-passport",
+            "foreign-passport",
+            "taxpayer-card",
+            "student-id-card",
+            "reference-internally-displaced-person"
+        ],
+        "diiaId": [
+            "hashedFilesSigning"
+        ]
+    }
+}

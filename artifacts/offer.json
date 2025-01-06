@@ -1,0 +1,8 @@
+{
+    "name": "Надайте свої дані для обробки",
+    "scopes": {
+        "sharing": [
+            "internal-passport", "foreign-passport", "taxpayer-card", "student-id-card", "reference-internally-displaced-person"
+        ]
+    }
+}

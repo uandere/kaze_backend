@@ -2,7 +2,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::time::Duration;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_secretsmanager::config::Region;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use axum_server::Handle;
 use clap::Parser;
@@ -51,7 +51,7 @@ pub fn run(
         let app = Router::new()
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route("/documents/generate", get(crate::routes::generate::generate))
-            .route("/diia", get(crate::routes::diia::diia))
+            .route("/diia", post(crate::routes::diia::diia))
             .layer(cors)
             .with_state(server_state);
 
