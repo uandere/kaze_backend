@@ -30,7 +30,7 @@ pub async fn graceful_shutdown(handle: Handle) {
         _ = terminate => info!("received terminate signal"),
     }
 
-    println!("sending graceful shutdown signal");
+    info!("sending graceful shutdown signal");
 
     // TODO: HERE WE NEED TO SAVE THE SERVER'S STATE
     handle.graceful_shutdown(Some(Duration::from_secs(10)));
