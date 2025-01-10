@@ -10,6 +10,7 @@ use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
+use crate::routes::request_id::request_id;
 use crate::utils::shutdown::graceful_shutdown;
 
 /// A function that starts the server.
@@ -52,6 +53,7 @@ pub fn run(
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route("/documents/generate", get(crate::routes::generate::generate))
             .route("/diia", post(crate::routes::diia::diia))
+            .route("/request_id", get(request_id))
             .layer(cors)
             .with_state(server_state);
 
