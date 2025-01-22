@@ -1,8 +1,5 @@
-pub mod generate;
-pub mod get;
+pub mod diia_signature;
 
-pub mod save;
-
-pub mod diia;
+pub mod diia_sharing;
 
 pub mod request_id;

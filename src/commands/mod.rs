@@ -1,10 +1,11 @@
 #![allow(dead_code)]
 
-pub mod subcommands;
+pub mod server;
 
 pub use super::*;
 use clap::Parser;
-use subcommands::server::ServerSubcommand;
+use server::ServerSubcommand;
+
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -22,7 +23,7 @@ pub enum Subcommands {
 impl Subcommands {
     pub fn run(self) {
         match self {
-            Subcommands::Server(command) => subcommands::server::run(command),
+            Subcommands::Server(command) => server::run(command),
         }
     }
 }

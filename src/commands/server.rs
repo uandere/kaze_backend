@@ -10,7 +10,7 @@ use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use crate::routes::request_id::request_id;
+use crate::routes::request_id::diia_user_info;
 use crate::utils::shutdown::graceful_shutdown;
 
 /// A function that starts the server.
@@ -49,11 +49,13 @@ pub fn run(
             .allow_methods([Method::GET, Method::POST])
             .allow_origin(Any);
 
+        // TODO: ask Diia team to change diia_sharing route to diia/sharing and 
+        // diia_signature to diia/signature.
         let app = Router::new()
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
-            .route("/documents/generate", get(crate::routes::generate::generate))
-            .route("/diia", post(crate::routes::diia::diia))
-            .route("/request_id", get(request_id))
+            .route("/diia/signature", get(crate::routes::diia_signature::diia_signature))
+            .route("/diia/sharing", post(crate::routes::diia_sharing::diia_sharing))
+            .route("/diia/is_user_authorized", get(diia_user_info))
             .layer(cors)
             .with_state(server_state);
 

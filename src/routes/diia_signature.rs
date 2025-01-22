@@ -1,6 +1,6 @@
 use axum::extract::{State, Json};
 use serde::{Deserialize, Serialize};
-use crate::commands::subcommands::server::ServerState;
+use crate::commands::server::ServerState;
 
 #[derive(Deserialize)]
 pub struct GeneratePayload {    
@@ -13,7 +13,7 @@ pub struct GenerateResponse {
 }
 
 
-pub async fn generate(
+pub async fn diia_signature(
     State(_state): State<ServerState>,
     _payload: Json<GeneratePayload>) -> Json<GenerateResponse> {
     Json(GenerateResponse { success: true })
