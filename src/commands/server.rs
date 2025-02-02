@@ -1,4 +1,5 @@
 use std::net::{SocketAddr, TcpListener};
+use std::sync::Arc;
 use std::time::Duration;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
@@ -11,6 +12,7 @@ use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 use crate::routes::request_id::diia_user_info;
+use crate::utils::config::Config;
 use crate::utils::shutdown::graceful_shutdown;
 
 /// A function that starts the server.
@@ -18,6 +20,7 @@ use crate::utils::shutdown::graceful_shutdown;
 pub fn run(
     ServerSubcommand {
         https_port,
+        config_path,
         // region,
     }: ServerSubcommand,
 ) {
@@ -38,8 +41,11 @@ pub fn run(
         // let aws_config = aws_config::from_env().region(region_provider).load().await;
         // let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
 
+        let config = Config::new(&config_path);
+
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
+            config: Arc::new(config),
             // aws_sm_client
         };
 
@@ -76,7 +82,7 @@ pub fn run(
 /// A state of the server.
 #[derive(Clone)]
 pub struct ServerState {
-    
+    config: Arc<Config>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 
@@ -87,6 +93,8 @@ pub struct ServerSubcommand {
     #[arg(long, default_value_t = 3000)]
     https_port: u16,
 
+    #[arg(long, default_value_t = String::from("./config.toml"))]
+    config_path: String,
 
     // /// The region on which the AWS is running.
     // #[arg(long, default_value_t = String::from("eu-central-1"))]
