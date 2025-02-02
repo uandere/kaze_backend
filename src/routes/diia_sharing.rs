@@ -1,7 +1,5 @@
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use tracing::info;
 use crate::commands::server::ServerState;
 
@@ -13,12 +11,20 @@ pub struct DiiaResponse {
     success: bool,
 }
 
+/// This route handles encrypted packages of data from that come from Diia servers.
+/// 
+/// For now, the pipeline of handling the data is:
+/// 1. Decrypting the data using EUSignCP library.
+/// 2. Verifying that the data is signed by Diia public certificate.
+/// 3. Storing the data inside the cache.
 pub async fn diia_sharing(
     State(_state): State<ServerState>,
     mut multipart: Multipart,
 ) -> Json<DiiaResponse> {
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        // 1) GET THE DATA
         let name = field.name().unwrap_or("<unnamed>").to_string();
+
         let file_name = field.file_name().map(|s| s.to_string()).unwrap_or_else(|| format!("{}.txt", name));
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
@@ -30,19 +36,18 @@ pub async fn diia_sharing(
         }
         info!("Field Value (bytes): {:?}", &value[..std::cmp::min(value.len(), 50)]);
 
-        // Save the field's value to a file
-        if let Err(e) = save_to_file(&file_name, &value).await {
-            info!("Failed to save file {}: {}", file_name, e);
+        if name != "encodeData" {
+            continue;
         }
+
+        // 2) DECRYPT THE DATA
+        
+
+        // 3) STORE THE DATA
+        
     }
 
     Json(DiiaResponse {
         success: true,
     })
-}
-
-async fn save_to_file(file_name: &str, data: &[u8]) -> std::io::Result<()> {
-    let mut file = File::create(file_name).await?;
-    file.write_all(data).await?;
-    Ok(())
 }

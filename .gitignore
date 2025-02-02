@@ -2,3 +2,4 @@ target/
 .idea/
 deploy/systemd/*.log
 artifacts/
+config.toml

@@ -1,0 +1,10 @@
+services:
+  kaze_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILDPLATFORM: linux/amd64
+    container_name: kaze_backend
+    ports:
+      - "3000:3000"
