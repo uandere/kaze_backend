@@ -1,9 +1,12 @@
-use std::str::from_utf8;
+use std::{ffi::c_ulong, str::from_utf8};
 
+use crate::{
+    commands::server::ServerState,
+    utils::{eusign::*, server_error::ServerError},
+};
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
 use tracing::info;
-use crate::{commands::server::ServerState, utils::{eusign::*, server_error::ServerError}};
 
 #[derive(Deserialize)]
 pub struct DiiaPayload {}
@@ -14,7 +17,7 @@ pub struct DiiaResponse {
 }
 
 /// This route handles encrypted packages of data from that come from Diia servers.
-/// 
+///
 /// For now, the pipeline of handling the data is:
 /// 1. Decrypting the data using EUSignCP library.
 /// 2. Verifying that the data is signed by Diia public certificate.
@@ -27,7 +30,10 @@ pub async fn diia_sharing(
         // 1) GET THE DATA
         let name = field.name().unwrap_or("<unnamed>").to_string();
 
-        let file_name = field.file_name().map(|s| s.to_string()).unwrap_or_else(|| format!("{}.txt", name));
+        let file_name = field
+            .file_name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{}.txt", name));
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
 
@@ -36,7 +42,10 @@ pub async fn diia_sharing(
         if let Some(content_type) = content_type {
             info!("Content Type: {}", content_type);
         }
-        info!("Field Value (bytes): {:?}", &value[..std::cmp::min(value.len(), 50)]);
+        info!(
+            "Field Value (bytes): {:?}",
+            &value[..std::cmp::min(value.len(), 50)]
+        );
 
         if name != "encodeData" {
             continue;
@@ -54,7 +63,7 @@ pub async fn diia_sharing(
                 println!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
                 std::process::exit(1);
             }
-    
+
             // 2) Get the interface pointer
             let p_iface = EUGetInterface();
             if p_iface.is_null() {
@@ -64,20 +73,31 @@ pub async fn diia_sharing(
             }
             G_P_IFACE = p_iface;
 
-            let cert_path = state.config.eusign.sz_path.clone() + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
+            let cert_path = state.config.eusign.sz_path.clone()
+                + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
 
             let cert = read_file_to_base64(&cert_path)?;
 
-            let data = decrypt_customer_data(&state.config, &cert, customer_data);
+            let dw_error = decrypt_customer_data(&state.config, &cert, customer_data);
 
-            info!("Decrypted data: {data}");
+            if dw_error != EU_ERROR_NONE as c_ulong {
+                println!("{}", get_error_message(dw_error));
+                // finalize/unload
+                if let Some(finalize_fn) = (*G_P_IFACE).Finalize {
+                    finalize_fn();
+                }
+                EUUnload();
+                std::process::exit(1);
+            }
+
+        // 6) Finalize the library
+        let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
+        finalize_fn();
+        EUUnload();
         }
 
         // 3) STORE THE DATA
-        
     }
 
-    Ok(Json(DiiaResponse {
-        success: true,
-    }))
+    Ok(Json(DiiaResponse { success: true }))
 }

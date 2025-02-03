@@ -7,7 +7,7 @@
 use std::{ffi::*, fs::File, io::Read, ptr};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use tracing::warn;
+use tracing::{info, warn};
 
 use super::{config::Config, server_error::ServerError};
 
@@ -1090,13 +1090,11 @@ pub unsafe fn decrypt_customer_data(
     pszSenderCert: &str,
     pszCustomerCrypto: &str,
 ) -> c_ulong {
-    // TODO: make separate future-like listeners that would control when the 
-    // certificates had changed.
-    let ppbCustomerData: &mut *mut c_uchar = &mut ptr::null_mut();
-    let pdwCustomerData: &mut c_ulong = &mut 0;
+    let mut ppbCustomerData: *mut c_uchar = ptr::null_mut();
+    let mut pdwCustomerData: c_ulong = 0;
 
-    let pSenderInfo: *mut EU_ENVELOP_INFO = &mut EU_ENVELOP_INFO::default();
-    let pSignInfo: *mut EU_SIGN_INFO = &mut EU_SIGN_INFO::default();
+    let mut pSenderInfo = EU_ENVELOP_INFO::default();
+    let mut pSignInfo = EU_SIGN_INFO::default();
 
 
     let dwError = Initialize((*config).clone());
@@ -1172,7 +1170,7 @@ pub unsafe fn decrypt_customer_data(
         0,
         &mut pbDecryptedCustomerData as *mut _,
         &mut dwDecryptedCustomerLength as *mut _,
-        pSenderInfo,
+        &mut pSenderInfo,
     );
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbCustomerCrypto);
@@ -1203,20 +1201,49 @@ pub unsafe fn decrypt_customer_data(
         developedSign,
         ptr::null_mut(),
         0,
-        ppbCustomerData,
-        pdwCustomerData,
-        pSignInfo,
+        &mut ppbCustomerData,
+        &mut pdwCustomerData,
+        &mut pSignInfo,
     );
     if err != EU_ERROR_NONE as c_ulong {
-        free_sender_info(pSenderInfo);
+        free_sender_info(&mut pSenderInfo);
         free_memory(pbDecryptedCustomerData);
         reset_private_key();
         return err;
     }
 
+    // 4) Convert raw bytes to string
+    let mut pszCustomerData = Vec::with_capacity(pdwCustomerData as usize + 1);
+    pszCustomerData.resize(pdwCustomerData as usize, 0);
+    // copy bytes
+    ptr::copy_nonoverlapping(
+        ppbCustomerData,
+        pszCustomerData.as_mut_ptr(),
+        pdwCustomerData as usize,
+    );
+    // zero-terminate
+    pszCustomerData.push(0);
+
+    // free the raw memory from the library
+    let free_memory = (*G_P_IFACE).FreeMemory.unwrap();
+    free_memory(ppbCustomerData);
+
+    // interpret as UTF-8
+    let customerData =
+        String::from_utf8_lossy(&pszCustomerData[..pdwCustomerData as usize]).to_string();
+
+    // 5) output
+    info!("{}", customerData);
+
     // 7) cleanup
     free_memory(pbDecryptedCustomerData);
     reset_private_key();
+
+    // free sign info, sender info, etc.
+    let free_sign_info = (*G_P_IFACE).FreeSignInfo.unwrap();
+    let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
+    free_sign_info(&mut pSignInfo as *mut _);
+    free_sender_info(&mut pSenderInfo as *mut _);
 
     EU_ERROR_NONE as c_ulong
 }
