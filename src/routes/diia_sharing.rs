@@ -6,7 +6,7 @@ use crate::{
 };
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(Deserialize)]
 pub struct DiiaPayload {}
@@ -60,14 +60,14 @@ pub async fn diia_sharing(
             let loaded = EULoad();
             if loaded == 0 {
                 // Means it failed
-                println!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
+                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
                 std::process::exit(1);
             }
 
             // 2) Get the interface pointer
             let p_iface = EUGetInterface();
             if p_iface.is_null() {
-                println!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
+                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
                 EUUnload();
                 std::process::exit(1);
             }
@@ -81,7 +81,7 @@ pub async fn diia_sharing(
             let dw_error = decrypt_customer_data(&state.config, &cert, customer_data);
 
             if dw_error != EU_ERROR_NONE as c_ulong {
-                println!("{}", get_error_message(dw_error));
+                error!("{}", get_error_message(dw_error));
                 // finalize/unload
                 if let Some(finalize_fn) = (*G_P_IFACE).Finalize {
                     finalize_fn();
