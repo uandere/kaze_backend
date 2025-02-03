@@ -757,6 +757,7 @@ pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
 pub unsafe fn Initialize(config: Config) -> c_ulong {
+    info!("HERE 1");
     let mut dwError: c_ulong;
 
     // If we are using the function-pointer interface, do:
@@ -770,6 +771,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         warn!("{}", get_error_message(dwError));
         return dwError;
     }
+    info!("HERE 2");
 
     // Example: set some runtime parameters
     //   g_pIface->SetRuntimeParameter(EU_SAVE_SETTINGS_PARAMETER, &nSaveSettings, EU_SAVE_SETTINGS_PARAMETER_LENGTH);
@@ -790,6 +792,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         &nSign as *const _ as *mut c_void,
         EU_SIGN_TYPE_LENGTH.into(),
     );
+    info!("HERE 3");
 
     set_ui_mode(0);
 
@@ -820,6 +823,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     if dwError != EU_ERROR_NONE as c_ulong {
         return dwError;
     }
+    info!("HERE 4");
 
     // Proxy settings
     let set_proxy_settings = (*G_P_IFACE).SetProxySettings.unwrap();
@@ -861,6 +865,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     if dwError != EU_ERROR_NONE as c_ulong {
         return dwError;
     }
+    info!("HERE 5");
 
     // Read CAs from JSON
     let jsonStr = fs::read_to_string(&config.eusign.cas_json_path).expect("unable to read files on `cas_json_path`");
@@ -882,6 +887,9 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
             }
         }
     }
+
+    info!("HERE 6");
+
 
     // TSP settings
     let set_tsp_settings = (*G_P_IFACE).SetTSPSettings.unwrap();
