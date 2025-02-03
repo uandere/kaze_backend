@@ -4,9 +4,13 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use std::{ffi::*, fs::File, io::Read, ptr};
+use std::ffi::*;
+use std::ptr;
+use std::io::Read;
+use std::fs::{self, File};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use super::{config::Config, server_error::ServerError};
@@ -620,7 +624,7 @@ pub unsafe fn EULoad() -> c_int {
     let ret = EUInitialize();
     // In the C code, success was "1" if loaded, "0" if not.
     // EUInitialize returns 0 if success, or an error code if not.
-    // If you found yourself asking "Why?" - don't worry. What did you 
+    // If you found yourself asking "Why?" - don't worry. What did you
     // expect from the non-opensourced cryptographic library, where developers
     // are only writing documentation in their heads and also in CP1251-encoded
     // Ukrainian appendix in the form of Microsoft Word document?
@@ -649,25 +653,62 @@ pub unsafe fn EUUnload() {
 }
 
 // Structures to mirror C++ usage:
-#[derive(Debug, Default)]
-struct CASettings {
-    issuerCNsv: Vec<String>,
-    address: String,
-    ocspAccessPointAddress: String,
-    ocspAccessPointPort: String,
-    cmpAddress: String,
-    tspAddress: String,
-    tspAddressPort: String,
-    certsInKey: bool,
-    directAccess: bool,
-    qscdSNInCert: bool,
-    cmpCompatibility: i32,
-    codeEDRPOU: String,
+// #[derive(Debug, Default)]
+// struct CASettings {
+//     issuerCNsv: Vec<String>,
+//     address: String,
+//     ocspAccessPointAddress: String,
+//     ocspAccessPointPort: String,
+//     cmpAddress: String,
+//     tspAddress: String,
+//     tspAddressPort: String,
+//     certsInKey: bool,
+//     directAccess: bool,
+//     qscdSNInCert: bool,
+//     cmpCompatibility: i32,
+//     codeEDRPOU: String,
+// }
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CASettings {
+    #[serde(rename = "issuerCNs")]
+    pub issuer_cns: Vec<String>,
+
+    pub address: String,
+
+    #[serde(rename = "ocspAccessPointAddress")]
+    pub ocsp_access_point_address: String,
+
+    #[serde(rename = "ocspAccessPointPort")]
+    pub ocsp_access_point_port: String,
+
+    #[serde(rename = "cmpAddress")]
+    pub cmp_address: String,
+
+    #[serde(rename = "tspAddress")]
+    pub tsp_address: String,
+
+    #[serde(rename = "tspAddressPort")]
+    pub tsp_address_port: String,
+
+    #[serde(rename = "certsInKey")]
+    pub certs_in_key: bool,
+
+    #[serde(rename = "directAccess")]
+    pub direct_access: bool,
+
+    #[serde(rename = "qscdSNInCert")]
+    pub qscd_sn_in_cert: bool,
+
+    #[serde(rename = "cmpCompatibility", deserialize_with = "string_to_int")]
+    pub cmp_compatibility: i32,
+
+    #[serde(rename = "codeEDRPOU")]
+    pub code_edrpou: String,
 }
 
 // We’ll store the pointer to EU_INTERFACE globally, as in C++ code:
 pub static mut G_P_IFACE: *const EU_INTERFACE = ptr::null();
-
 
 /// Helper: `GetErrorMessage` logic, but in Rust.
 /// Gets the detailed description of the error by error number.
@@ -689,137 +730,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     msg
 }
 
-fn remove_character_if_immediately_followed_by(s: &mut String, target: char, next_char: char) {
-    let mut result = String::with_capacity(s.len());
-
-    // We'll iterate through the characters of `s`, peeking ahead to see
-    // if the next character is `next_char`.
-    let mut chars = s.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == target {
-            if let Some(&peek_ch) = chars.peek() {
-                if peek_ch == next_char {
-                    // Skip pushing `ch` (i.e. remove it), but do NOT consume `peek_ch`;
-                    // we only skip the `target`, so continue to next iteration
-                    continue;
-                }
-            }
-        }
-        result.push(ch);
-    }
-
-    *s = result;
-}
-
-fn get_value(json: &str, key: &str) -> String {
-    // First, find `"key"` in the JSON
-    let needle = format!("\"{}\"", key);
-    let key_pos = match json.find(&needle) {
-        Some(pos) => pos,
-        None => return String::new(),
-    };
-
-    // Next, from that point forward, find the first `:`
-    // This is naive and doesn’t handle nested structures.
-    let after_key = &json[key_pos..];
-    let colon_pos = match after_key.find(':') {
-        Some(pos) => pos,
-        None => return String::new(),
-    };
-
-    // The value presumably starts after that colon
-    let start_val = key_pos + colon_pos + 1;
-    let mut val_str = &json[start_val..];
-
-    // Trim any leading whitespace
-    val_str = val_str.trim_start();
-
-    // Now read until the next comma or closing brace
-    let stop_index = match val_str.find(&[',', '}'][..]) {
-        Some(i) => i,
-        None => val_str.len(),
-    };
-    let val_str = &val_str[..stop_index];
-
-    val_str.trim().to_string()
-}
-
-/// Naive function to parse an array in the form:
-///
-///    `"key": [ "item1", "item2", "item3" ]`
-///
-/// It returns the vector of strings: `["item1", "item2", "item3"]`.
-fn parse_array(json: &str, key: &str) -> Vec<String> {
-    let mut result = Vec::new();
-
-    let needle = format!("\"{}\"", key);
-    // 1) Find `"key"` in `json`
-    let start_key = match json.find(&needle) {
-        Some(pos) => pos,
-        None => return result,
-    };
-
-    // 2) From that slice forward, find the first '['
-    let after_key = &json[start_key..];
-    let bracket_offset = match after_key.find('[') {
-        Some(pos) => pos,
-        None => return result,
-    };
-
-    // The array contents begin just after '['
-    let array_start_index = start_key + bracket_offset + 1;
-
-    // 3) Find the matching ']' after that
-    let remainder = &json[array_start_index..];
-    let bracket_end_rel = match remainder.find(']') {
-        Some(pos) => pos,
-        None => return result,
-    };
-
-    let array_end_index = array_start_index + bracket_end_rel;
-
-    // 4) The contents between '[' and ']' is:
-    let array_slice = &json[array_start_index..array_end_index];
-
-    // 5) Split that slice on commas, each part is one "element"
-    for raw_item in array_slice.split(',') {
-        let raw_item = raw_item.trim();
-        // Possibly remove surrounding quotes
-        let mut item = strip_quotes(raw_item.to_string());
-        // Also remove backslashes if followed by quote (like \" in JSON)
-        remove_character_if_immediately_followed_by(&mut item, '\\', '"');
-        result.push(item);
-    }
-
-    result
-}
-
-fn parse_ca(json: &str) -> CASettings {
-    let mut ca = CASettings::default();
-
-    // issuerCNs array
-    ca.issuerCNsv = parse_array(json, "issuerCNs");
-
-    // Each field
-    ca.address = strip_quotes(get_value(json, "address"));
-    ca.ocspAccessPointAddress = strip_quotes(get_value(json, "ocspAccessPointAddress"));
-    ca.ocspAccessPointPort = strip_quotes(get_value(json, "ocspAccessPointPort"));
-    ca.cmpAddress = strip_quotes(get_value(json, "cmpAddress"));
-    ca.tspAddress = strip_quotes(get_value(json, "tspAddress"));
-    ca.tspAddressPort = strip_quotes(get_value(json, "tspAddressPort"));
-
-    ca.certsInKey = get_value(json, "certsInKey").contains("true");
-    ca.directAccess = get_value(json, "directAccess").contains("true");
-    ca.qscdSNInCert = get_value(json, "qscdSNInCert").contains("true");
-
-    let cmp_str = get_value(json, "cmpCompatibility");
-    ca.cmpCompatibility = parse_int_in_string(&cmp_str).unwrap_or(-1);
-
-    ca.codeEDRPOU = strip_quotes(get_value(json, "codeEDRPOU"));
-
-    ca
-}
-
 fn strip_quotes(s: String) -> String {
     let s = s.trim();
     let s = s.strip_prefix('"').unwrap_or(s); // remove leading quote if present
@@ -827,58 +737,19 @@ fn strip_quotes(s: String) -> String {
     s.to_string()
 }
 
-// Extract digits from a string and parse them as an integer
-fn parse_int_in_string(s: &str) -> Option<i32> {
-    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
-    if digits.is_empty() {
-        None
-    } else {
-        digits.parse::<i32>().ok()
-    }
+/// Deserialize a string containing digits into an i32.
+fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut s: String = Deserialize::deserialize(deserializer)?;
+    s = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    s.parse::<i32>().map_err(serde::de::Error::custom)
 }
 
-fn parse_CAs_array(json_array: &str) -> Vec<CASettings> {
-    let mut ca_list = Vec::new();
-    let mut start = 0;
-    while let Some(obj_pos) = json_array[start..].find('{') {
-        let actual_pos = start + obj_pos;
-        if let Some(end_pos) = json_array[actual_pos..].find('}') {
-            let actual_end = actual_pos + end_pos;
-            let json_object = &json_array[actual_pos..=actual_end];
-            let ca = parse_ca(json_object);
-            ca_list.push(ca);
-            start = actual_end + 1;
-        } else {
-            break;
-        }
-    }
-    ca_list
-}
-
-fn read_all_bytes(file_path: &str) -> Vec<u8> {
-    match std::fs::read(file_path) {
-        Ok(data) => data,
-        Err(e) => {
-            warn!(
-                "IIT EU Sign Usage: Cannot open file for reading: {}",
-                file_path
-            );
-            vec![]
-        }
-    }
-}
-
-fn read_file_to_string(file_path: &str) -> String {
-    match std::fs::read_to_string(file_path) {
-        Ok(s) => s,
-        Err(e) => {
-            warn!(
-                "IIT EU Sign Usage: cannot open file for reading: {}",
-                file_path
-            );
-            String::new()
-        }
-    }
+/// Parse a JSON string containing an array of CASettings.
+pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
+    serde_json::from_str(json)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -992,15 +863,15 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     }
 
     // Read CAs from JSON
-    let jsonStr = read_file_to_string(&config.eusign.cas_json_path);
-    let cas = parse_CAs_array(&jsonStr);
+    let jsonStr = fs::read_to_string(&config.eusign.cas_json_path).expect("unable to read files on `cas_json_path`");
+    let cas = parse_cas(&jsonStr).expect("unable to parse CAs");
 
     let set_ocsp_access_info_settings = (*G_P_IFACE).SetOCSPAccessInfoSettings.unwrap();
     for ca_obj in &cas {
-        for issuer_cn in &ca_obj.issuerCNsv {
+        for issuer_cn in &ca_obj.issuer_cns {
             let c_issuer = CString::new(issuer_cn.as_str()).unwrap();
-            let c_ocsp = CString::new(ca_obj.ocspAccessPointAddress.as_str()).unwrap();
-            let c_port = CString::new(ca_obj.ocspAccessPointPort.as_str()).unwrap();
+            let c_ocsp = CString::new(ca_obj.ocsp_access_point_address.as_str()).unwrap();
+            let c_port = CString::new(ca_obj.ocsp_access_point_port.as_str()).unwrap();
             dwError = set_ocsp_access_info_settings(
                 c_issuer.as_ptr() as *mut c_char,
                 c_ocsp.as_ptr() as *mut c_char,
@@ -1057,7 +928,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     // Load CA certificates:
     {
         let save_certificates = (*G_P_IFACE).SaveCertificates.unwrap();
-        let mut res = read_all_bytes(&config.eusign.ca_certificates_path);
+        let mut res = fs::read(&config.eusign.ca_certificates_path).unwrap();
         if !res.is_empty() {
             let err = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
             if err != EU_ERROR_NONE as c_ulong {
@@ -1094,7 +965,6 @@ pub unsafe fn decrypt_customer_data(
 
     let mut pSenderInfo = EU_ENVELOP_INFO::default();
     let mut pSignInfo = EU_SIGN_INFO::default();
-
 
     let dwError = Initialize((*config).clone());
     if dwError != EU_ERROR_NONE as c_ulong {
