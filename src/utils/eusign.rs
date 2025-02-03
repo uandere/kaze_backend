@@ -738,11 +738,16 @@ fn deserialize_bool_contains_true<'de, D>(deserializer: D) -> Result<bool, D::Er
 where
     D: serde::Deserializer<'de>,
 {
-    // Deserialize the value as a String.
+
+    // First try to deserialize as a bool.
+    if let Ok(b) = bool::deserialize(deserializer) {
+        // If it’s already a boolean, return it directly.
+        return Ok(b);
+    }
+    // Otherwise, deserialize as a string.
     let s: String = Deserialize::deserialize(deserializer)?;
     Ok(s.contains("true"))
 }
-
 
 /// Deserialize a string containing digits into an i32.
 fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
@@ -756,6 +761,7 @@ where
 
 /// Parse a JSON string containing an array of CASettings.
 pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
+    info!("CAS: {}", json);
     serde_json::from_str(json)
 }
 
