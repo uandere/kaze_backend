@@ -874,7 +874,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     let cas = match parse_cas(&jsonStr) {
         Ok(v) => v,
         Err(e) => {
-            error!("unable to parse CAs");
+            error!("unable to parse CAs: {e}");
             panic!()
         },
     };
