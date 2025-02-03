@@ -664,6 +664,7 @@ pub static mut G_P_IFACE: *const EU_INTERFACE = ptr::null();
 ///////////////////////////////////////////////////////////////////////////////
 // Helper: Provide the same "GetErrorMessage" logic, but in Rust
 ///////////////////////////////////////////////////////////////////////////////
+/// # Safety
 pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     if G_P_IFACE.is_null() {
         return "Library not loaded".to_string();
@@ -884,6 +885,7 @@ fn write_all_text(file_path: &str, data: &str) {
 ///////////////////////////////////////////////////////////////////////////////
 // The "Initialize()" logic from example usage
 ///////////////////////////////////////////////////////////////////////////////
+/// # Safety
 pub unsafe fn Initialize(config: Config) -> c_ulong {
     let mut dwError: c_ulong;
 
@@ -1042,10 +1044,11 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     // CMP settings (unused)
     let set_cmp_settings = (*G_P_IFACE).SetCMPSettings.unwrap();
     let c_empty = CString::new("").unwrap();
+    let port = CString::new("80").unwrap();
     dwError = set_cmp_settings(
         1, // bUseCMP
         c_empty.as_ptr() as *mut c_char,
-        CString::new("80").unwrap().as_ptr() as *mut c_char,
+        port.as_ptr() as *mut c_char,
         c_empty.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
@@ -1079,6 +1082,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
 ///////////////////////////////////////////////////////////////////////////////
 // Rust alternative for DevelopCustomerCrypto(...) from C++
 ///////////////////////////////////////////////////////////////////////////////
+/// # Safety
 pub unsafe fn decrypt_customer_data(
     // pszPrivKeyFilePath: &str,
     // pszPrivKeyPassword: &str,
