@@ -692,15 +692,17 @@ pub struct CASettings {
     #[serde(rename = "tspAddressPort")]
     pub tsp_address_port: String,
 
-    #[serde(rename = "certsInKey")]
+    // These three boolean fields are deserialized by checking if the string contains "true".
+    #[serde(rename = "certsInKey", deserialize_with = "deserialize_bool_contains_true")]
     pub certs_in_key: bool,
 
-    #[serde(rename = "directAccess")]
+    #[serde(rename = "directAccess", deserialize_with = "deserialize_bool_contains_true")]
     pub direct_access: bool,
 
-    #[serde(rename = "qscdSNInCert")]
+    #[serde(rename = "qscdSNInCert", deserialize_with = "deserialize_bool_contains_true")]
     pub qscd_sn_in_cert: bool,
 
+    // cmpCompatibility is a string containing digits, which we parse into an i32.
     #[serde(rename = "cmpCompatibility", deserialize_with = "string_to_int")]
     pub cmp_compatibility: i32,
 
@@ -730,6 +732,17 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
     msg
 }
+
+/// Custom deserializer that treats a string as true if it contains "true"
+fn deserialize_bool_contains_true<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Deserialize the value as a String.
+    let s: String = Deserialize::deserialize(deserializer)?;
+    Ok(s.contains("true"))
+}
+
 
 /// Deserialize a string containing digits into an i32.
 fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
