@@ -11,6 +11,7 @@ use std::fs::{self, File};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use tracing::{info, warn};
 
 use super::{config::Config, server_error::ServerError};
@@ -730,13 +731,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     msg
 }
 
-fn strip_quotes(s: String) -> String {
-    let s = s.trim();
-    let s = s.strip_prefix('"').unwrap_or(s); // remove leading quote if present
-    let s = s.strip_suffix('"').unwrap_or(s); // remove trailing quote if present
-    s.to_string()
-}
-
 /// Deserialize a string containing digits into an i32.
 fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
 where
@@ -744,7 +738,7 @@ where
 {
     let mut s: String = Deserialize::deserialize(deserializer)?;
     s = s.chars().filter(|c| c.is_ascii_digit()).collect();
-    s.parse::<i32>().map_err(serde::de::Error::custom)
+    Ok(s.parse::<i32>().unwrap_or(-1))
 }
 
 /// Parse a JSON string containing an array of CASettings.
@@ -757,7 +751,6 @@ pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
 pub unsafe fn Initialize(config: Config) -> c_ulong {
-    info!("HERE 1");
     let mut dwError: c_ulong;
 
     // If we are using the function-pointer interface, do:
@@ -771,7 +764,6 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         warn!("{}", get_error_message(dwError));
         return dwError;
     }
-    info!("HERE 2");
 
     // Example: set some runtime parameters
     //   g_pIface->SetRuntimeParameter(EU_SAVE_SETTINGS_PARAMETER, &nSaveSettings, EU_SAVE_SETTINGS_PARAMETER_LENGTH);
@@ -792,7 +784,6 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         &nSign as *const _ as *mut c_void,
         EU_SIGN_TYPE_LENGTH.into(),
     );
-    info!("HERE 3");
 
     set_ui_mode(0);
 
@@ -823,7 +814,6 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     if dwError != EU_ERROR_NONE as c_ulong {
         return dwError;
     }
-    info!("HERE 4");
 
     // Proxy settings
     let set_proxy_settings = (*G_P_IFACE).SetProxySettings.unwrap();
@@ -865,13 +855,19 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     if dwError != EU_ERROR_NONE as c_ulong {
         return dwError;
     }
-    info!("HERE 5");
 
     // Read CAs from JSON
     let jsonStr = fs::read_to_string(&config.eusign.cas_json_path).expect("unable to read files on `cas_json_path`");
-    let cas = parse_cas(&jsonStr).expect("unable to parse CAs");
+    let cas = match parse_cas(&jsonStr) {
+        Ok(v) => v,
+        Err(e) => {
+            error!("unable to parse CAs");
+            panic!()
+        },
+    };
 
     let set_ocsp_access_info_settings = (*G_P_IFACE).SetOCSPAccessInfoSettings.unwrap();
+
     for ca_obj in &cas {
         for issuer_cn in &ca_obj.issuer_cns {
             let c_issuer = CString::new(issuer_cn.as_str()).unwrap();
@@ -888,7 +884,6 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         }
     }
 
-    info!("HERE 6");
 
 
     // TSP settings
