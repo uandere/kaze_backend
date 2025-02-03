@@ -653,23 +653,6 @@ pub unsafe fn EUUnload() {
     EUFinalize();
 }
 
-// Structures to mirror C++ usage:
-// #[derive(Debug, Default)]
-// struct CASettings {
-//     issuerCNsv: Vec<String>,
-//     address: String,
-//     ocspAccessPointAddress: String,
-//     ocspAccessPointPort: String,
-//     cmpAddress: String,
-//     tspAddress: String,
-//     tspAddressPort: String,
-//     certsInKey: bool,
-//     directAccess: bool,
-//     qscdSNInCert: bool,
-//     cmpCompatibility: i32,
-//     codeEDRPOU: String,
-// }
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CASettings {
     #[serde(rename = "issuerCNs")]
@@ -693,13 +676,13 @@ pub struct CASettings {
     pub tsp_address_port: String,
 
     // These three boolean fields are deserialized by checking if the string contains "true".
-    #[serde(rename = "certsInKey", deserialize_with = "deserialize_bool_contains_true")]
+    #[serde(default, rename = "certsInKey")]
     pub certs_in_key: bool,
 
-    #[serde(rename = "directAccess", deserialize_with = "deserialize_bool_contains_true")]
+    #[serde(default, rename = "directAccess")]
     pub direct_access: bool,
 
-    #[serde(rename = "qscdSNInCert", deserialize_with = "deserialize_bool_contains_true")]
+    #[serde(default, rename = "qscdSNInCert")]
     pub qscd_sn_in_cert: bool,
 
     // cmpCompatibility is a string containing digits, which we parse into an i32.
@@ -731,22 +714,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     // Convert from C-string
     let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
     msg
-}
-
-/// Custom deserializer that treats a string as true if it contains "true"
-fn deserialize_bool_contains_true<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-
-    // First try to deserialize as a bool.
-    if let Ok(b) = bool::deserialize(deserializer) {
-        // If it’s already a boolean, return it directly.
-        return Ok(b);
-    }
-    // Otherwise, deserialize as a string.
-    let s: String = Deserialize::deserialize(deserializer)?;
-    Ok(s.contains("true"))
 }
 
 /// Deserialize a string containing digits into an i32.
