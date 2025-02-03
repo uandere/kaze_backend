@@ -82,7 +82,7 @@ pub fn run(
 /// A state of the server.
 #[derive(Clone)]
 pub struct ServerState {
-    config: Arc<Config>,
+    pub config: Arc<Config>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 

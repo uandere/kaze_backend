@@ -38,6 +38,8 @@ COPY --from=builder /kaze_backend/kaze_backend /usr/local/bin/kaze_backend
 
 COPY --from=builder /kaze_backend/libs/eusign/shared /kaze_backend/libs/eusign/shared
 
+COPY --from=builder /kaze_backend/config.toml /kaze_backend/
+
 ENV LD_LIBRARY_PATH="/kaze_backend/libs/eusign/shared:${LD_LIBRARY_PATH}"
 
 EXPOSE 3000

@@ -2,7 +2,7 @@ use std::{ffi::c_int, fs};
 
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EUSignConfig {
     pub private_key_path: String,
     pub private_key_password: String,
@@ -18,9 +18,9 @@ pub struct EUSignConfig {
     pub default_tsp_server: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
-    pub eusign_config: EUSignConfig,
+    pub eusign: EUSignConfig,
 }
 
 impl Config {

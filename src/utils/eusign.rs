@@ -7,6 +7,7 @@
 use std::{ffi::*, fs::File, io::Read, ptr};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use tracing::warn;
 
 use super::{config::Config, server_error::ServerError};
 
@@ -17,6 +18,43 @@ pub const DLL_PROCESS_ATTACH: u32 = 1;
 pub const DLL_PROCESS_DETACH: u32 = 0;
 pub const DLL_THREAD_ATTACH: u32 = 2;
 pub const DLL_THREAD_DETACH: u32 = 3;
+
+impl Default for EU_ENVELOP_INFO {
+    fn default() -> Self {
+        Self {
+            bFilled: Default::default(),
+            pszIssuer: ptr::null_mut(),
+            pszIssuerCN: ptr::null_mut(),
+            pszSerial: ptr::null_mut(),
+            pszSubject: ptr::null_mut(),
+            pszSubjCN: ptr::null_mut(),
+            pszSubjOrg: ptr::null_mut(),
+            pszSubjOrgUnit: ptr::null_mut(),
+            pszSubjTitle: ptr::null_mut(),
+            pszSubjState: ptr::null_mut(),
+            pszSubjLocality: ptr::null_mut(),
+            pszSubjFullName: ptr::null_mut(),
+            pszSubjAddress: ptr::null_mut(),
+            pszSubjPhone: ptr::null_mut(),
+            pszSubjEMail: ptr::null_mut(),
+            pszSubjDNS: ptr::null_mut(),
+            pszSubjEDRPOUCode: ptr::null_mut(),
+            pszSubjDRFOCode: ptr::null_mut(),
+            bTimeAvail: Default::default(),
+            bTimeStamp: Default::default(),
+            Time: _SYSTEMTIME {
+                wYear: 0,
+                wMonth: 0,
+                wDayOfWeek: 0,
+                wDay: 0,
+                wHour: 0,
+                wMinute: 0,
+                wSecond: 0,
+                wMilliseconds: 0,
+            },
+        }
+    }
+}
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
@@ -621,12 +659,12 @@ struct CASettings {
 }
 
 // We’ll store the pointer to EU_INTERFACE globally, as in C++ code:
-static mut G_P_IFACE: *const EU_INTERFACE = ptr::null();
+pub static mut G_P_IFACE: *const EU_INTERFACE = ptr::null();
 
 ///////////////////////////////////////////////////////////////////////////////
 // Helper: Provide the same "GetErrorMessage" logic, but in Rust
 ///////////////////////////////////////////////////////////////////////////////
-unsafe fn get_error_message(dwError: c_ulong) -> String {
+pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     if G_P_IFACE.is_null() {
         return "Library not loaded".to_string();
     }
@@ -667,7 +705,7 @@ fn read_file_to_string(file_path: &str) -> String {
     match std::fs::read_to_string(file_path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!(
+            warn!(
                 "IIT EU Sign Usage: cannot open file for reading: {}",
                 file_path
             );
@@ -824,7 +862,7 @@ fn read_all_bytes(file_path: &str) -> Vec<u8> {
     match std::fs::read(file_path) {
         Ok(data) => data,
         Err(e) => {
-            eprintln!(
+            warn!(
                 "IIT EU Sign Usage: Cannot open file for reading: {}",
                 file_path
             );
@@ -836,7 +874,7 @@ fn read_all_bytes(file_path: &str) -> Vec<u8> {
 fn write_all_text(file_path: &str, data: &str) {
     let res = std::fs::write(file_path, data);
     if let Err(e) = res {
-        eprintln!(
+        warn!(
             "IIT EU Sign Usage: cannot write to file {}: {}",
             file_path, e
         );
@@ -844,9 +882,9 @@ fn write_all_text(file_path: &str, data: &str) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// The "Initialize()" logic from example. We replicate it in Rust.
+// The "Initialize()" logic from example usage
 ///////////////////////////////////////////////////////////////////////////////
-unsafe fn Initialize(config: Config) -> c_ulong {
+pub unsafe fn Initialize(config: Config) -> c_ulong {
     let mut dwError: c_ulong;
 
     // If we are using the function-pointer interface, do:
@@ -857,7 +895,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 
     dwError = initialize_fn();
     if dwError != EU_ERROR_NONE as c_ulong {
-        println!("{}", get_error_message(dwError));
+        warn!("{}", get_error_message(dwError));
         return dwError;
     }
 
@@ -888,7 +926,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 
     // File store settings
     let set_file_store_settings = (*G_P_IFACE).SetFileStoreSettings.unwrap();
-    let pszPath = CString::new(config.eusign_config.sz_path).unwrap();
+    let pszPath = CString::new(config.eusign.sz_path).unwrap();
     let bCheckCRLs = 0;
     let bAutoRefresh = 1;
     let bOwnCRLsOnly = 0;
@@ -913,13 +951,13 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 
     // Proxy settings
     let set_proxy_settings = (*G_P_IFACE).SetProxySettings.unwrap();
-    let pszProxyAddress = CString::new(config.eusign_config.proxy_address).unwrap();
-    let pszProxyPort = CString::new(config.eusign_config.proxy_port).unwrap();
-    let pszProxyUser = CString::new(config.eusign_config.proxy_user).unwrap();
-    let pszProxyPwd = CString::new(config.eusign_config.proxy_password).unwrap();
+    let pszProxyAddress = CString::new(config.eusign.proxy_address).unwrap();
+    let pszProxyPort = CString::new(config.eusign.proxy_port).unwrap();
+    let pszProxyUser = CString::new(config.eusign.proxy_user).unwrap();
+    let pszProxyPwd = CString::new(config.eusign.proxy_password).unwrap();
 
     dwError = set_proxy_settings(
-        config.eusign_config.proxy_use,
+        config.eusign.proxy_use,
         0, // bProxyAnonymous
         pszProxyAddress.as_ptr() as *mut c_char,
         pszProxyPort.as_ptr() as *mut c_char,
@@ -933,7 +971,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 
     // OCSP settings
     let set_ocsp_settings = (*G_P_IFACE).SetOCSPSettings.unwrap();
-    let pszOCSPAddress = CString::new(config.eusign_config.default_ocsp_server).unwrap();
+    let pszOCSPAddress = CString::new(config.eusign.default_ocsp_server).unwrap();
     let pszOCSPPort = CString::new("80").unwrap();
 
     dwError = set_ocsp_settings(
@@ -953,7 +991,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
     }
 
     // Read CAs from JSON
-    let jsonStr = read_file_to_string(&config.eusign_config.cas_json_path);
+    let jsonStr = read_file_to_string(&config.eusign.cas_json_path);
     let cas = parse_CAs_array(&jsonStr);
 
     let set_ocsp_access_info_settings = (*G_P_IFACE).SetOCSPAccessInfoSettings.unwrap();
@@ -975,7 +1013,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 
     // TSP settings
     let set_tsp_settings = (*G_P_IFACE).SetTSPSettings.unwrap();
-    let c_tsp_addr = CString::new(config.eusign_config.default_tsp_server).unwrap();
+    let c_tsp_addr = CString::new(config.eusign.default_tsp_server).unwrap();
     let c_tsp_port = CString::new("80").unwrap();
 
     dwError = set_tsp_settings(
@@ -1017,7 +1055,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
     // Load CA certificates:
     {
         let save_certificates = (*G_P_IFACE).SaveCertificates.unwrap();
-        let mut res = read_all_bytes(&config.eusign_config.ca_certificates_path);
+        let mut res = read_all_bytes(&config.eusign.ca_certificates_path);
         if !res.is_empty() {
             let err = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
             if err != EU_ERROR_NONE as c_ulong {
@@ -1031,7 +1069,7 @@ unsafe fn Initialize(config: Config) -> c_ulong {
     let mut pvContext: *mut c_void = ptr::null_mut();
     dwError = ctx_create(&mut pvContext as *mut _);
     if dwError != EU_ERROR_NONE as c_ulong {
-        println!("{}", get_error_message(dwError));
+        warn!("{}", get_error_message(dwError));
         return dwError;
     }
 
@@ -1039,24 +1077,27 @@ unsafe fn Initialize(config: Config) -> c_ulong {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DevelopCustomerCrypto(...) in Rust
+// Rust alternative for DevelopCustomerCrypto(...) from C++
 ///////////////////////////////////////////////////////////////////////////////
-unsafe fn DevelopCustomerCrypto(
-    pszPrivKeyFilePath: &str,
-    pszPrivKeyPassword: &str,
+pub unsafe fn decrypt_customer_data(
+    // pszPrivKeyFilePath: &str,
+    // pszPrivKeyPassword: &str,
+    config: &Config,
     pszSenderCert: &str,
     pszCustomerCrypto: &str,
-    ppbCustomerData: &mut *mut c_uchar,
-    pdwCustomerData: &mut c_ulong,
-    pSenderInfo: *mut EU_ENVELOP_INFO,
-    pSignInfo: *mut EU_SIGN_INFO,
 ) -> c_ulong {
-    // TODO: move to upper caller
-    let config = Config::new("./config.toml");
+    // TODO: make separate future-like listeners that would control when the 
+    // certificates had changed.
+    let ppbCustomerData: &mut *mut c_uchar = &mut ptr::null_mut();
+    let pdwCustomerData: &mut c_ulong = &mut 0;
 
-    let dwError = Initialize(config);
+    let pSenderInfo: *mut EU_ENVELOP_INFO = &mut EU_ENVELOP_INFO::default();
+    let pSignInfo: *mut EU_SIGN_INFO = &mut EU_SIGN_INFO::default();
+
+
+    let dwError = Initialize((*config).clone());
     if dwError != EU_ERROR_NONE as c_ulong {
-        println!("{}", dwError);
+        warn!("{}", get_error_message(dwError));
         return dwError;
     }
 
@@ -1071,8 +1112,8 @@ unsafe fn DevelopCustomerCrypto(
     let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
 
     // 1) Read private key
-    let c_key_path = CString::new(pszPrivKeyFilePath).unwrap();
-    let c_key_pwd = CString::new(pszPrivKeyPassword).unwrap();
+    let c_key_path = CString::new(config.eusign.private_key_path.clone()).unwrap();
+    let c_key_pwd = CString::new(config.eusign.private_key_password.clone()).unwrap();
     let mut err = read_private_key_file(
         c_key_path.as_ptr() as *mut c_char,
         c_key_pwd.as_ptr() as *mut c_char,
