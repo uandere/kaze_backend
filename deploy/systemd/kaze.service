@@ -16,6 +16,8 @@ TimeoutStopSec=infinity
 KillSignal=SIGINT
 StandardOutput=append:/home/ubuntu/kaze_backend/deploy/systemd/stdin.log
 StandardError=append:/home/ubuntu/kaze_backend/deploy/systemd/stderr.log
+WorkingDirectory=/home/ubuntu/kaze_backend
+Environment="LD_LIBRARY_PATH=/home/ubuntu/kaze_backend/libs/eusign/shared:/usr/lib"
 
 [Install]
 WantedBy=multi-user.target
