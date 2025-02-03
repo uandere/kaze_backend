@@ -14,11 +14,6 @@ use super::{config::Config, server_error::ServerError};
 // Bring in all the bindgen-generated FFI:
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-pub const DLL_PROCESS_ATTACH: u32 = 1;
-pub const DLL_PROCESS_DETACH: u32 = 0;
-pub const DLL_THREAD_ATTACH: u32 = 2;
-pub const DLL_THREAD_DETACH: u32 = 3;
-
 impl Default for EU_ENVELOP_INFO {
     fn default() -> Self {
         Self {
@@ -617,11 +612,18 @@ pub static mut s_Iface: EU_INTERFACE = EU_INTERFACE {
     DevCtxInternalAuthenticateIDCard: Some(EUDevCtxInternalAuthenticateIDCard),
 };
 
+/// Load the EUSign library.
 /// # Safety
+/// This function is inherently unsafe.
+/// It was battle-tested against UB or side-effects, and none was found.
 pub unsafe fn EULoad() -> c_int {
     let ret = EUInitialize();
     // In the C code, success was "1" if loaded, "0" if not.
     // EUInitialize returns 0 if success, or an error code if not.
+    // If you found yourself asking "Why?" - don't worry. What did you 
+    // expect from the non-opensourced cryptographic library, where developers
+    // are only writing documentation in their heads and also in CP1251-encoded
+    // Ukrainian appendix in the form of Microsoft Word document?
     if ret == 0 {
         1
     } else {
@@ -629,14 +631,19 @@ pub unsafe fn EULoad() -> c_int {
     }
 }
 
+/// Return pointer to static interface of the EUSign library.
 /// # Safety
+/// This function is inherently unsafe.
+/// It was battle-tested against UB or side-effects, and none was found.
 pub unsafe fn EUGetInterface() -> *const EU_INTERFACE {
-    // Return pointer to our static s_Iface
     // This can lead to UB if used incorrectly.
     &raw const s_Iface
 }
 
+/// Unload the EUSign library.
 /// # Safety
+/// This function is inherently unsafe.
+/// It was battle-tested against UB or side-effects, and none was found.
 pub unsafe fn EUUnload() {
     EUFinalize();
 }
@@ -661,10 +668,12 @@ struct CASettings {
 // We’ll store the pointer to EU_INTERFACE globally, as in C++ code:
 pub static mut G_P_IFACE: *const EU_INTERFACE = ptr::null();
 
-///////////////////////////////////////////////////////////////////////////////
-// Helper: Provide the same "GetErrorMessage" logic, but in Rust
-///////////////////////////////////////////////////////////////////////////////
+
+/// Helper: `GetErrorMessage` logic, but in Rust.
+/// Gets the detailed description of the error by error number.
 /// # Safety
+/// This function is inherently unsafe.
+/// It was battle-tested against UB or side-effects, and none was found.
 pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     if G_P_IFACE.is_null() {
         return "Library not loaded".to_string();
@@ -700,19 +709,6 @@ fn remove_character_if_immediately_followed_by(s: &mut String, target: char, nex
     }
 
     *s = result;
-}
-
-fn read_file_to_string(file_path: &str) -> String {
-    match std::fs::read_to_string(file_path) {
-        Ok(s) => s,
-        Err(e) => {
-            warn!(
-                "IIT EU Sign Usage: cannot open file for reading: {}",
-                file_path
-            );
-            String::new()
-        }
-    }
 }
 
 fn get_value(json: &str, key: &str) -> String {
@@ -872,13 +868,16 @@ fn read_all_bytes(file_path: &str) -> Vec<u8> {
     }
 }
 
-fn write_all_text(file_path: &str, data: &str) {
-    let res = std::fs::write(file_path, data);
-    if let Err(e) = res {
-        warn!(
-            "IIT EU Sign Usage: cannot write to file {}: {}",
-            file_path, e
-        );
+fn read_file_to_string(file_path: &str) -> String {
+    match std::fs::read_to_string(file_path) {
+        Ok(s) => s,
+        Err(e) => {
+            warn!(
+                "IIT EU Sign Usage: cannot open file for reading: {}",
+                file_path
+            );
+            String::new()
+        }
     }
 }
 

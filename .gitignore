@@ -3,3 +3,5 @@ target/
 deploy/systemd/*.log
 artifacts/
 config.toml
+CA-*.p7b
+!CACertificates.p7b
