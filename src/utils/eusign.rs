@@ -676,18 +676,18 @@ pub struct CASettings {
     pub tsp_address_port: String,
 
     // These three boolean fields are deserialized by checking if the string contains "true".
-    #[serde(default, rename = "certsInKey")]
-    pub certs_in_key: bool,
+    #[serde(rename = "certsInKey")]
+    pub certs_in_key: Option<bool>,
 
-    #[serde(default, rename = "directAccess")]
-    pub direct_access: bool,
+    #[serde(rename = "directAccess")]
+    pub direct_access: Option<bool>,
 
-    #[serde(default, rename = "qscdSNInCert")]
-    pub qscd_sn_in_cert: bool,
+    #[serde(rename = "qscdSNInCert")]
+    pub qscd_sn_in_cert: Option<bool>,
 
     // cmpCompatibility is a string containing digits, which we parse into an i32.
-    #[serde(rename = "cmpCompatibility", deserialize_with = "string_to_int")]
-    pub cmp_compatibility: i32,
+    #[serde(rename = "cmpCompatibility")]
+    pub cmp_compatibility: Option<i32>,
 
     #[serde(rename = "codeEDRPOU")]
     pub code_edrpou: String,
@@ -714,16 +714,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     // Convert from C-string
     let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
     msg
-}
-
-/// Deserialize a string containing digits into an i32.
-fn string_to_int<'de, D>(deserializer: D) -> Result<i32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let mut s: String = Deserialize::deserialize(deserializer)?;
-    s = s.chars().filter(|c| c.is_ascii_digit()).collect();
-    Ok(s.parse::<i32>().unwrap_or(-1))
 }
 
 /// Parse a JSON string containing an array of CASettings.
