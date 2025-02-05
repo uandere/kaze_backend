@@ -5,6 +5,7 @@ pub mod server;
 pub use super::*;
 use clap::Parser;
 use server::ServerSubcommand;
+use tracing::error;
 
 
 #[derive(Parser)]
@@ -23,7 +24,18 @@ pub enum Subcommands {
 impl Subcommands {
     pub fn run(self) {
         match self {
-            Subcommands::Server(command) => server::run(command),
+            Subcommands::Server(command) => {
+                let res = server::run(command);
+
+                match res {
+                    Ok(_) => {
+                        error!("The server shut down unexpectedly");
+                    },
+                    Err(e) => {
+                        error!("The server returned the error: {e:?}");
+                    },
+                }
+            },
         }
     }
 }

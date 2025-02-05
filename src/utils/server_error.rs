@@ -1,6 +1,7 @@
 use axum::response::{IntoResponse, Response};
 use http::StatusCode;
 
+#[derive(Debug)]
 pub struct ServerError (
     pub anyhow::Error,
 );

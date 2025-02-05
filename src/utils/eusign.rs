@@ -718,7 +718,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
 
 /// Parse a JSON string containing an array of CASettings.
 pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
-    info!("CAS: {}", json);
     serde_json::from_str(json)
 }
 
@@ -859,8 +858,6 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
             }
         }
     }
-
-
 
     // TSP settings
     let set_tsp_settings = (*G_P_IFACE).SetTSPSettings.unwrap();

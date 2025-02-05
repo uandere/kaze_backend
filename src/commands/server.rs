@@ -3,6 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
+use crate::routes::request_id::diia_user_info;
+use crate::utils::config::Config;
+use crate::utils::eusign::Initialize;
+use crate::utils::shutdown::graceful_shutdown;
 use axum::routing::{get, post};
 use axum::Router;
 use axum_server::Handle;
@@ -11,9 +15,8 @@ use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use crate::routes::request_id::diia_user_info;
-use crate::utils::config::Config;
-use crate::utils::shutdown::graceful_shutdown;
+
+use super::utils::server_error::ServerError;
 
 /// A function that starts the server.
 /// For now, we can configure the port to run on.
@@ -23,16 +26,13 @@ pub fn run(
         config_path,
         // region,
     }: ServerSubcommand,
-) {
-    let runtime = Runtime::new().unwrap();
+) -> Result<(), ServerError> {
+    let runtime = Runtime::new()?;
 
-    tracing_subscriber::fmt()
-        .with_ansi(false)
-        .init();
-
+    tracing_subscriber::fmt().with_ansi(false).init();
 
     runtime.block_on(async {
-        let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port))).unwrap();
+        let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
 
         // let region_provider = RegionProviderChain::first_try(Region::new(region))
         //     .or_default_provider()
@@ -43,24 +43,31 @@ pub fn run(
 
         let config = Config::new(&config_path);
 
+        
+
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
             // aws_sm_client
         };
 
-
         let cors = CorsLayer::new()
             .allow_headers(Any)
             .allow_methods([Method::GET, Method::POST])
             .allow_origin(Any);
 
-        // TODO: ask Diia team to change diia_sharing route to diia/sharing and 
+        // TODO: ask Diia team to change diia_sharing route to diia/sharing and
         // diia_signature to diia/signature.
         let app = Router::new()
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
-            .route("/diia/signature", get(crate::routes::diia_signature::diia_signature))
-            .route("/diia/sharing", post(crate::routes::diia_sharing::diia_sharing))
+            .route(
+                "/diia/signature",
+                get(crate::routes::diia_signature::diia_signature),
+            )
+            .route(
+                "/diia/sharing",
+                post(crate::routes::diia_sharing::diia_sharing),
+            )
             .route("/diia/is_user_authorized", get(diia_user_info))
             .layer(cors)
             .with_state(server_state);
@@ -74,9 +81,10 @@ pub fn run(
         axum_server::from_tcp(listener)
             .handle(shutdown_handle)
             .serve(app.into_make_service())
-            .await
-            .unwrap();
-    });
+            .await?;
+
+        Ok(())
+    })
 }
 
 /// A state of the server.
@@ -95,12 +103,10 @@ pub struct ServerSubcommand {
 
     #[arg(long, default_value_t = String::from("./config.toml"))]
     config_path: String,
-
     // /// The region on which the AWS is running.
     // #[arg(long, default_value_t = String::from("eu-central-1"))]
     // region: String
 }
-
 
 /// A helper function for parsing duration.
 fn parse_duration(arg: &str) -> Result<Duration, std::num::ParseIntError> {

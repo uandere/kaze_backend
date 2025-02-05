@@ -30,8 +30,6 @@ RUN mv target/release/kaze_backend /kaze_backend/
 ##########################################
 FROM --platform=${BUILDPLATFORM} debian:stable-slim AS runtime
 
-# RUN apt-get update && apt-get install -y ca-certificates
-
 WORKDIR /kaze_backend
 
 COPY --from=builder /kaze_backend/kaze_backend /usr/local/bin/kaze_backend
