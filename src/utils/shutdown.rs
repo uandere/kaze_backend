@@ -1,14 +1,14 @@
 use axum_server::Handle;
-use std::time::Duration;
+use std::{ffi::c_void, time::Duration};
 use tokio::signal;
 use tracing::info;
 
-use crate::utils::eusign::{EUUnload, G_P_IFACE};
+use crate::{commands::server::ServerState, utils::eusign::{EUUnload, G_P_IFACE}};
 
 /// This function is used for graceful shutdown.
 /// Probably should be replaced with something more robust.
 /// It was decided to panic in case we were unable to install a signal handler.
-pub async fn graceful_shutdown(handle: Handle) {
+pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -33,17 +33,17 @@ pub async fn graceful_shutdown(handle: Handle) {
 
     info!("sending graceful shutdown signal");
 
-    // Unload the EUSign library
+    // Free the EUSign library
     unsafe {
-        let reset_private_key = (*G_P_IFACE).ResetPrivateKey.unwrap();
-        reset_private_key();
+        let ctx_free_private_key = (*G_P_IFACE).CtxFreePrivateKey.expect("wasn't able to free the private key context");
+        ctx_free_private_key(state.ctx.key_ctx as *mut c_void);
+
+        let ctx_free = (*G_P_IFACE).CtxFree.expect("wasn't able to free the library context");
+        ctx_free(state.ctx.lib_ctx as *mut c_void);
 
         let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
         finalize_fn();
 
-        // let free_ctx_fn: (*G_P_IFACE).CtxFree.unwrap();
-        // free_ctx_fn();
-        
         EUUnload();
     }
 

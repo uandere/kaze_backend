@@ -1,4 +1,4 @@
-use std::{ffi::c_ulong, str::from_utf8};
+use std::str::from_utf8;
 
 use crate::{
     commands::server::ServerState,
@@ -6,7 +6,7 @@ use crate::{
 };
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::info;
 
 #[derive(Deserialize)]
 pub struct DiiaPayload {}
@@ -56,9 +56,11 @@ pub async fn diia_sharing(
         // 2) DECRYPT THE DATA
         // Load the EUSignCP library
         // Load all the necessary things
-        unsafe {
-            // let result = decrypt_customer_data(&state.config, &cert, customer_data)?;
-        }
+        let result = unsafe {
+            decrypt_customer_data(&state, customer_data)?
+        };
+
+        info!("The result of the decryption: {}", result);
 
         // 3) STORE THE DATA
     }

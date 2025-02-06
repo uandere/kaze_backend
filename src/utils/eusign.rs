@@ -5,14 +5,16 @@
 #![allow(dead_code)]
 
 use std::ffi::*;
-use std::ptr;
-use std::io::Read;
 use std::fs::{self, File};
+use std::io::Read;
+use std::ptr;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use tracing::error;
-use tracing::{info, warn};
+use tracing::warn;
+
+use crate::commands::server::ServerState;
 
 use super::server_error::EusignError;
 use super::{config::Config, server_error::ServerError};
@@ -833,13 +835,14 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
     }
 
     // Read CAs from JSON
-    let jsonStr = fs::read_to_string(&config.eusign.cas_json_path).expect("unable to read files on `cas_json_path`");
+    let jsonStr = fs::read_to_string(&config.eusign.cas_json_path)
+        .expect("unable to read files on `cas_json_path`");
     let cas = match parse_cas(&jsonStr) {
         Ok(v) => v,
         Err(e) => {
             error!("unable to parse CAs: {e}");
             panic!()
-        },
+        }
     };
 
     let set_ocsp_access_info_settings = (*G_P_IFACE).SetOCSPAccessInfoSettings.unwrap();
@@ -931,8 +934,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
 pub unsafe fn decrypt_customer_data(
-    config: &Config,
-    pszSenderCert: &str,
+    state: &ServerState,
     pszCustomerCrypto: &str,
 ) -> Result<String, EusignError> {
     let mut ppbCustomerData: *mut c_uchar = ptr::null_mut();
@@ -942,34 +944,20 @@ pub unsafe fn decrypt_customer_data(
     let mut pSignInfo = EU_SIGN_INFO::default();
 
     // Because we do lots of calls, let's define closures for shorter usage:
-    let read_private_key_file = (*G_P_IFACE).ReadPrivateKeyFile.unwrap();
-    let reset_private_key = (*G_P_IFACE).ResetPrivateKey.unwrap();
     let base64_decode = (*G_P_IFACE).BASE64Decode.unwrap();
     let free_memory = (*G_P_IFACE).FreeMemory.unwrap();
-    let develop_data_ex = (*G_P_IFACE).DevelopDataEx.unwrap();
+    let ctx_develop_data = (*G_P_IFACE).CtxDevelopData.unwrap();
     let base64_encode = (*G_P_IFACE).BASE64Encode.unwrap();
-    let verify_data_internal = (*G_P_IFACE).VerifyDataInternal.unwrap();
+    let ctx_verify_data_internal = (*G_P_IFACE).CtxVerifyDataInternal.unwrap();
     let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
 
     let mut err: c_ulong;
-
-    // 1) Read private key
-    // let c_key_path = CString::new(config.eusign.private_key_path.clone()).unwrap();
-    // let c_key_pwd = CString::new(config.eusign.private_key_password.clone()).unwrap();
-    // let mut err = read_private_key_file(
-    //     c_key_path.as_ptr() as *mut c_char,
-    //     c_key_pwd.as_ptr() as *mut c_char,
-    //     ptr::null_mut(),
-    // );
-    // if err != EU_ERROR_NONE as c_ulong {
-    //     return Err(EusignError(err));
-    // }
 
     // 2) Decode Sender cert
     let mut pbSenderCert: *mut c_uchar = ptr::null_mut();
     let mut dwSenderCertLength: c_ulong = 0;
     {
-        let c_sender_cert = CString::new(pszSenderCert).unwrap();
+        let c_sender_cert = CString::new(state.cert.as_bytes()).unwrap();
         err = base64_decode(
             c_sender_cert.as_ptr() as *mut c_char,
             &mut pbSenderCert as *mut _,
@@ -1000,7 +988,8 @@ pub unsafe fn decrypt_customer_data(
     let mut pbDecryptedCustomerData: *mut c_uchar = ptr::null_mut();
     let mut dwDecryptedCustomerLength: c_ulong = 0;
 
-    err = develop_data_ex(
+    err = ctx_develop_data(
+        state.ctx.key_ctx as *mut c_void,   // This is safe, since docs and developers say that here key context will not change.
         ptr::null_mut(),
         pbCustomerCrypto,
         dwCustomerCryptoLength,
@@ -1032,11 +1021,12 @@ pub unsafe fn decrypt_customer_data(
         return Err(EusignError(err));
     }
 
-    // 6) verify_data_internal
-    err = verify_data_internal(
-        developedSign,
-        ptr::null_mut(),
+    // 6) Verify signature
+    err = ctx_verify_data_internal(
+        state.ctx.lib_ctx as *mut c_void,
         0,
+        pbDecryptedCustomerData,
+        dwDecryptedCustomerLength,
         &mut ppbCustomerData,
         &mut pdwCustomerData,
         &mut pSignInfo,
@@ -1091,13 +1081,10 @@ pub fn read_file_to_base64(path: &str) -> Result<String, ServerError> {
 }
 
 pub struct EusignContext {
-    pub ptr: *const c_void,
+    pub lib_ctx: *const c_void,
+    pub key_ctx: *const c_void,
 }
 
-unsafe impl Send for EusignContext {
-    
-}
+unsafe impl Send for EusignContext {}
 
-unsafe impl Sync for EusignContext {
-    
-}
+unsafe impl Sync for EusignContext {}

@@ -47,9 +47,9 @@ pub fn run(
         let config = Config::new(&config_path);
 
         // A code to load the EUSign library
-        let mut cert;
-        let mut eusign_ctx;
-        let mut private_key_ctx = ptr::null_mut();
+        let cert;
+        let lib_ctx: *mut c_void;
+        let mut key_ctx: *mut c_void = ptr::null_mut();
 
         unsafe {
             let loaded = EULoad();
@@ -74,15 +74,14 @@ pub fn run(
             cert = read_file_to_base64(&cert_path)?;
 
             // Creating library context
-            eusign_ctx = Initialize(config.clone())?;
+            lib_ctx = Initialize(config.clone())?;
 
-
-            let read_private_key_file = (*G_P_IFACE).CtxReadPrivateKeyFile.unwrap();
+            let ctx_read_private_key_file = (*G_P_IFACE).CtxReadPrivateKeyFile.unwrap();
 
             let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
             let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
 
-            read_private_key_file(eusign_ctx, c_key_path.as_ptr() as *mut c_char, c_key_pwd.as_ptr() as *mut c_char, private_key_ctx, ptr::null_mut());
+            ctx_read_private_key_file(lib_ctx, c_key_path.as_ptr() as *mut c_char, c_key_pwd.as_ptr() as *mut c_char, &mut key_ctx, ptr::null_mut());
             
         }
 
@@ -90,7 +89,7 @@ pub fn run(
         let server_state = ServerState {
             config: Arc::new(config),
             cert: Arc::new(cert),
-            ctx: Arc::new(EusignContext { ptr: eusign_ctx }),
+            ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
             // aws_sm_client
         };
 
@@ -113,11 +112,11 @@ pub fn run(
             )
             .route("/diia/is_user_authorized", get(diia_user_info))
             .layer(cors)
-            .with_state(server_state);
+            .with_state(server_state.clone());
 
         // graceful shutdown
         let shutdown_handle = Handle::new();
-        tokio::spawn(graceful_shutdown(shutdown_handle.clone()));
+        tokio::spawn(graceful_shutdown(shutdown_handle.clone(), server_state));
 
         info!("Starting the server...");
 
