@@ -1,11 +1,14 @@
+use std::ffi::{c_char, c_ulong, c_void, CString};
 use std::net::{SocketAddr, TcpListener};
+use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
 use crate::routes::request_id::diia_user_info;
 use crate::utils::config::Config;
-use crate::utils::eusign::Initialize;
+use crate::utils::eusign::*;
+use crate::utils::server_error::EusignError;
 use crate::utils::shutdown::graceful_shutdown;
 use axum::routing::{get, post};
 use axum::Router;
@@ -14,7 +17,7 @@ use clap::Parser;
 use http::Method;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{error, info};
 
 use super::utils::server_error::ServerError;
 
@@ -43,11 +46,51 @@ pub fn run(
 
         let config = Config::new(&config_path);
 
-        
+        // A code to load the EUSign library
+        let mut cert;
+        let mut eusign_ctx;
+        let mut private_key_ctx = ptr::null_mut();
+
+        unsafe {
+            let loaded = EULoad();
+            if loaded == 0 {
+                // Means it failed
+                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
+                return Err(EusignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
+            }
+
+            // 2) Get the interface pointer
+            let p_iface = EUGetInterface();
+            if p_iface.is_null() {
+                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
+                EUUnload();
+                return Err(EusignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
+            }
+            G_P_IFACE = p_iface;
+
+            let cert_path = config.eusign.sz_path.clone()
+                + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
+
+            cert = read_file_to_base64(&cert_path)?;
+
+            // Creating library context
+            eusign_ctx = Initialize(config.clone())?;
+
+
+            let read_private_key_file = (*G_P_IFACE).CtxReadPrivateKeyFile.unwrap();
+
+            let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
+            let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
+
+            read_private_key_file(eusign_ctx, c_key_path.as_ptr() as *mut c_char, c_key_pwd.as_ptr() as *mut c_char, private_key_ctx, ptr::null_mut());
+            
+        }
 
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
+            cert: Arc::new(cert),
+            ctx: Arc::new(EusignContext { ptr: eusign_ctx }),
             // aws_sm_client
         };
 
@@ -91,6 +134,9 @@ pub fn run(
 #[derive(Clone)]
 pub struct ServerState {
     pub config: Arc<Config>,
+    pub cert: Arc<String>,
+    /// A pointer to the context of the library
+    pub ctx: Arc<EusignContext>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 

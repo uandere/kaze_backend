@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 use tracing::{info, warn};
 
+use super::server_error::EusignError;
 use super::{config::Config, server_error::ServerError};
 
 // Bring in all the bindgen-generated FFI:
@@ -725,7 +726,7 @@ pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
 // The "Initialize()" logic from example usage
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
-pub unsafe fn Initialize(config: Config) -> c_ulong {
+pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
     let mut dwError: c_ulong;
 
     // If we are using the function-pointer interface, do:
@@ -737,7 +738,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     dwError = initialize_fn();
     if dwError != EU_ERROR_NONE as c_ulong {
         warn!("{}", get_error_message(dwError));
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // Example: set some runtime parameters
@@ -787,7 +788,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         dwExpireTime.into(),
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // Proxy settings
@@ -807,7 +808,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         1, // bProxySavePassword
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // OCSP settings
@@ -822,13 +823,13 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         pszOCSPPort.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     let set_ocsp_access_info_mode_settings = (*G_P_IFACE).SetOCSPAccessInfoModeSettings.unwrap();
     dwError = set_ocsp_access_info_mode_settings(1);
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // Read CAs from JSON
@@ -854,7 +855,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
                 c_port.as_ptr() as *mut c_char,
             );
             if dwError != EU_ERROR_NONE as c_ulong {
-                return dwError;
+                return Err(EusignError(dwError));
             }
         }
     }
@@ -870,7 +871,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         c_tsp_port.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // LDAP settings (unused)
@@ -884,7 +885,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         ptr::null_mut(),
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // CMP settings (unused)
@@ -898,7 +899,7 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         c_empty.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
     // Load CA certificates:
@@ -906,9 +907,9 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
         let save_certificates = (*G_P_IFACE).SaveCertificates.unwrap();
         let mut res = fs::read(&config.eusign.ca_certificates_path).unwrap();
         if !res.is_empty() {
-            let err = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
-            if err != EU_ERROR_NONE as c_ulong {
-                return err;
+            let dwError = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
+            if dwError != EU_ERROR_NONE as c_ulong {
+                return Err(EusignError(dwError));
             }
         }
     }
@@ -919,10 +920,10 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
     dwError = ctx_create(&mut pvContext as *mut _);
     if dwError != EU_ERROR_NONE as c_ulong {
         warn!("{}", get_error_message(dwError));
-        return dwError;
+        return Err(EusignError(dwError));
     }
 
-    EU_ERROR_NONE as c_ulong
+    Ok(pvContext)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -930,23 +931,15 @@ pub unsafe fn Initialize(config: Config) -> c_ulong {
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
 pub unsafe fn decrypt_customer_data(
-    // pszPrivKeyFilePath: &str,
-    // pszPrivKeyPassword: &str,
     config: &Config,
     pszSenderCert: &str,
     pszCustomerCrypto: &str,
-) -> c_ulong {
+) -> Result<String, EusignError> {
     let mut ppbCustomerData: *mut c_uchar = ptr::null_mut();
     let mut pdwCustomerData: c_ulong = 0;
 
     let mut pSenderInfo = EU_ENVELOP_INFO::default();
     let mut pSignInfo = EU_SIGN_INFO::default();
-
-    let dwError = Initialize((*config).clone());
-    if dwError != EU_ERROR_NONE as c_ulong {
-        warn!("{}", get_error_message(dwError));
-        return dwError;
-    }
 
     // Because we do lots of calls, let's define closures for shorter usage:
     let read_private_key_file = (*G_P_IFACE).ReadPrivateKeyFile.unwrap();
@@ -958,17 +951,19 @@ pub unsafe fn decrypt_customer_data(
     let verify_data_internal = (*G_P_IFACE).VerifyDataInternal.unwrap();
     let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
 
+    let mut err: c_ulong;
+
     // 1) Read private key
-    let c_key_path = CString::new(config.eusign.private_key_path.clone()).unwrap();
-    let c_key_pwd = CString::new(config.eusign.private_key_password.clone()).unwrap();
-    let mut err = read_private_key_file(
-        c_key_path.as_ptr() as *mut c_char,
-        c_key_pwd.as_ptr() as *mut c_char,
-        ptr::null_mut(),
-    );
-    if err != EU_ERROR_NONE as c_ulong {
-        return err;
-    }
+    // let c_key_path = CString::new(config.eusign.private_key_path.clone()).unwrap();
+    // let c_key_pwd = CString::new(config.eusign.private_key_password.clone()).unwrap();
+    // let mut err = read_private_key_file(
+    //     c_key_path.as_ptr() as *mut c_char,
+    //     c_key_pwd.as_ptr() as *mut c_char,
+    //     ptr::null_mut(),
+    // );
+    // if err != EU_ERROR_NONE as c_ulong {
+    //     return Err(EusignError(err));
+    // }
 
     // 2) Decode Sender cert
     let mut pbSenderCert: *mut c_uchar = ptr::null_mut();
@@ -981,8 +976,7 @@ pub unsafe fn decrypt_customer_data(
             &mut dwSenderCertLength as *mut _,
         );
         if err != EU_ERROR_NONE as c_ulong {
-            reset_private_key();
-            return err;
+            return Err(EusignError(err));
         }
     }
 
@@ -998,8 +992,7 @@ pub unsafe fn decrypt_customer_data(
         );
         if err != EU_ERROR_NONE as c_ulong {
             free_memory(pbSenderCert);
-            reset_private_key();
-            return err;
+            return Err(EusignError(err));
         }
     }
 
@@ -1020,8 +1013,7 @@ pub unsafe fn decrypt_customer_data(
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbCustomerCrypto);
         free_memory(pbSenderCert);
-        reset_private_key();
-        return err;
+        return Err(EusignError(err));
     }
 
     // free intermediate
@@ -1037,8 +1029,7 @@ pub unsafe fn decrypt_customer_data(
     );
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbDecryptedCustomerData);
-        reset_private_key();
-        return err;
+        return Err(EusignError(err));
     }
 
     // 6) verify_data_internal
@@ -1053,8 +1044,7 @@ pub unsafe fn decrypt_customer_data(
     if err != EU_ERROR_NONE as c_ulong {
         free_sender_info(&mut pSenderInfo);
         free_memory(pbDecryptedCustomerData);
-        reset_private_key();
-        return err;
+        return Err(EusignError(err));
     }
 
     // 4) Convert raw bytes to string
@@ -1077,12 +1067,8 @@ pub unsafe fn decrypt_customer_data(
     let customerData =
         String::from_utf8_lossy(&pszCustomerData[..pdwCustomerData as usize]).to_string();
 
-    // 5) output
-    info!("{}", customerData);
-
     // 7) cleanup
     free_memory(pbDecryptedCustomerData);
-    reset_private_key();
 
     // free sign info, sender info, etc.
     let free_sign_info = (*G_P_IFACE).FreeSignInfo.unwrap();
@@ -1090,7 +1076,7 @@ pub unsafe fn decrypt_customer_data(
     free_sign_info(&mut pSignInfo as *mut _);
     free_sender_info(&mut pSenderInfo as *mut _);
 
-    EU_ERROR_NONE as c_ulong
+    Ok(customerData)
 }
 
 pub fn read_file_to_base64(path: &str) -> Result<String, ServerError> {
@@ -1102,4 +1088,16 @@ pub fn read_file_to_base64(path: &str) -> Result<String, ServerError> {
     let encoded = STANDARD.encode(&buffer);
 
     Ok(encoded)
+}
+
+pub struct EusignContext {
+    pub ptr: *const c_void,
+}
+
+unsafe impl Send for EusignContext {
+    
+}
+
+unsafe impl Sync for EusignContext {
+    
 }

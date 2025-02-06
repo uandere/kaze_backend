@@ -57,43 +57,7 @@ pub async fn diia_sharing(
         // Load the EUSignCP library
         // Load all the necessary things
         unsafe {
-            let loaded = EULoad();
-            if loaded == 0 {
-                // Means it failed
-                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
-                std::process::exit(1);
-            }
-
-            // 2) Get the interface pointer
-            let p_iface = EUGetInterface();
-            if p_iface.is_null() {
-                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
-                EUUnload();
-                std::process::exit(1);
-            }
-            G_P_IFACE = p_iface;
-
-            let cert_path = state.config.eusign.sz_path.clone()
-                + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
-
-            let cert = read_file_to_base64(&cert_path)?;
-
-            let dw_error = decrypt_customer_data(&state.config, &cert, customer_data);
-
-            if dw_error != EU_ERROR_NONE as c_ulong {
-                error!("{}", get_error_message(dw_error));
-                // finalize/unload
-                if let Some(finalize_fn) = (*G_P_IFACE).Finalize {
-                    finalize_fn();
-                }
-                EUUnload();
-                std::process::exit(1);
-            }
-
-        // 6) Finalize the library
-        let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
-        finalize_fn();
-        EUUnload();
+            // let result = decrypt_customer_data(&state.config, &cert, customer_data)?;
         }
 
         // 3) STORE THE DATA

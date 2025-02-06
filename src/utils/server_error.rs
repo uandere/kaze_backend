@@ -1,10 +1,13 @@
+use std::ffi::c_ulong;
+
+use anyhow::anyhow;
 use axum::response::{IntoResponse, Response};
 use http::StatusCode;
 
+use super::eusign::get_error_message;
+
 #[derive(Debug)]
-pub struct ServerError (
-    pub anyhow::Error,
-);
+pub struct ServerError(pub anyhow::Error);
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
@@ -24,5 +27,15 @@ where
 {
     fn from(err: E) -> Self {
         Self(err.into())
+    }
+}
+
+pub struct EusignError(pub c_ulong);
+
+impl From<EusignError> for ServerError {
+    fn from(err: EusignError) -> Self {
+        Self(anyhow!(format!("Eusign error: {}", unsafe {
+            get_error_message(err.0)
+        })))
     }
 }

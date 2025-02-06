@@ -1,8 +1,9 @@
 use axum_server::Handle;
-use tracing::info;
 use std::time::Duration;
 use tokio::signal;
-use tokio::time::sleep;
+use tracing::info;
+
+use crate::utils::eusign::{EUUnload, G_P_IFACE};
 
 /// This function is used for graceful shutdown.
 /// Probably should be replaced with something more robust.
@@ -32,12 +33,20 @@ pub async fn graceful_shutdown(handle: Handle) {
 
     info!("sending graceful shutdown signal");
 
+    // Unload the EUSign library
+    unsafe {
+        let reset_private_key = (*G_P_IFACE).ResetPrivateKey.unwrap();
+        reset_private_key();
+
+        let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
+        finalize_fn();
+
+        // let free_ctx_fn: (*G_P_IFACE).CtxFree.unwrap();
+        // free_ctx_fn();
+        
+        EUUnload();
+    }
+
     // TODO: HERE WE NEED TO SAVE THE SERVER'S STATE
     handle.graceful_shutdown(Some(Duration::from_secs(10)));
-
-    loop {
-        sleep(Duration::from_secs(1)).await;
-
-        info!("alive connections: {}", handle.connection_count());
-    }
 }
