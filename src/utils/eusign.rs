@@ -837,7 +837,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
     let cas = match parse_cas(&jsonStr) {
         Ok(v) => v,
         Err(e) => {
-            error!("unable to parse CAs");
+            error!("unable to parse CAs: {e}");
             panic!()
         },
     };
