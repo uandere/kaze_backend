@@ -63,6 +63,11 @@ pub async fn diia_sharing(
         info!("The result of the decryption: {}", result);
 
         // 3) STORE THE DATA
+
+        // Deserializing using serde
+        let result: DecryptionResult = serde_json::from_str(&result)?;
+
+        
     }
 
     Ok(Json(DiiaResponse { success: true }))

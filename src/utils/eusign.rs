@@ -989,7 +989,7 @@ pub unsafe fn decrypt_customer_data(
     let mut dwDecryptedCustomerLength: c_ulong = 0;
 
     err = ctx_develop_data(
-        state.ctx.key_ctx as *mut c_void,   // This is safe, since docs and developers say that here key context will not change.
+        state.ctx.key_ctx as *mut c_void, // This is safe, since docs and developers say that here key context will not change.
         ptr::null_mut(),
         pbCustomerCrypto,
         dwCustomerCryptoLength,
@@ -1080,11 +1080,122 @@ pub fn read_file_to_base64(path: &str) -> Result<String, ServerError> {
     Ok(encoded)
 }
 
+/// A struct that holds the context of the EUSignLibrary.
 pub struct EusignContext {
     pub lib_ctx: *const c_void,
     pub key_ctx: *const c_void,
 }
 
+/// Safe to implement Send because after creation the pointers
+/// are guaranteed to not change.
 unsafe impl Send for EusignContext {}
 
+/// Safe to implement Sync because after creation the pointers
+/// are guaranteed to not change.
 unsafe impl Sync for EusignContext {}
+
+
+
+#[derive(Debug, Deserialize)]
+pub struct DecryptionResult {
+    #[serde(rename = "requestId")]
+    request_id: String,
+
+    #[serde(rename = "documentTypes")]
+    document_types: Vec<String>,
+
+    data: DocumentData,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DocumentData {
+    #[serde(rename = "taxpayer-card")]
+    taxpayer_card: Vec<TaxpayerCard>,
+
+    #[serde(rename = "internal-passport")]
+    internal_passport: Vec<InternalPassport>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TaxpayerCard {
+    #[serde(rename = "creationDate")]
+    creation_date: String,
+
+    #[serde(rename = "docNumber")]
+    doc_number: String,
+
+    #[serde(rename = "lastNameUA")]
+    last_name_ua: String,
+
+    #[serde(rename = "firstNameUA")]
+    first_name_ua: String,
+
+    #[serde(rename = "middleNameUA")]
+    middle_name_ua: String,
+
+    #[serde(rename = "birthday")]
+    birthday: String,
+
+    #[serde(rename = "fileName")]
+    file_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InternalPassport {
+    #[serde(rename = "taxpayerNumber")]
+    taxpayer_number: String,
+
+    #[serde(rename = "residenceUA")]
+    residence_ua: String,
+
+    #[serde(rename = "docNumber")]
+    doc_number: String,
+
+    #[serde(rename = "genderUA")]
+    gender_ua: String,
+
+    #[serde(rename = "nationalityUA")]
+    nationality_ua: String,
+
+    #[serde(rename = "lastNameUA")]
+    last_name_ua: String,
+
+    #[serde(rename = "firstNameUA")]
+    first_name_ua: String,
+
+    #[serde(rename = "middleNameUA")]
+    middle_name_ua: String,
+
+    #[serde(rename = "birthday")]
+    birthday: String,
+
+    #[serde(rename = "birthPlaceUA")]
+    birth_place_ua: String,
+
+    #[serde(rename = "issueDate")]
+    issue_date: String,
+
+    #[serde(rename = "expirationDate")]
+    expiration_date: String,
+
+    #[serde(rename = "recordNumber")]
+    record_number: String,
+
+    #[serde(rename = "department")]
+    department: String,
+
+    #[serde(rename = "genderEN")]
+    gender_en: String,
+
+    #[serde(rename = "id")]
+    id: String,
+
+    #[serde(rename = "lastNameEN")]
+    last_name_en: String,
+
+    #[serde(rename = "firstNameEN")]
+    first_name_en: String,
+
+    #[serde(rename = "fileName")]
+    file_name: String,
+}
