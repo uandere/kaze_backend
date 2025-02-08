@@ -3,3 +3,4 @@ pub mod shutdown;
 pub mod eusign;
 pub mod config;
 pub mod server_error;
+pub mod cache;

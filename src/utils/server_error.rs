@@ -20,7 +20,7 @@ impl IntoResponse for ServerError {
 }
 
 // This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
-// `Result<_, AppError>`. That way you don't need to do that manually.
+// `Result<_, AppError>`.
 impl<E> From<E> for ServerError
 where
     E: Into<anyhow::Error>,

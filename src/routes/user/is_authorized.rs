@@ -13,7 +13,7 @@ pub struct GenerateResponse {
 }
 
 
-pub async fn diia_signature(
+pub async fn handler(
     State(_state): State<ServerState>,
     _payload: Json<GeneratePayload>) -> Json<GenerateResponse> {
     Json(GenerateResponse { success: true })

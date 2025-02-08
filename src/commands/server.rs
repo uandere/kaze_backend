@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
-use crate::routes::request_id::diia_user_info;
+use crate::utils::cache::build_cache;
 use crate::utils::config::Config;
 use crate::utils::eusign::*;
 use crate::utils::server_error::EusignError;
@@ -15,6 +15,7 @@ use axum::Router;
 use axum_server::Handle;
 use clap::Parser;
 use http::Method;
+use moka::future::Cache;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
@@ -28,6 +29,7 @@ pub fn run(
         https_port,
         config_path,
         // region,
+        challenge_cache_update_freq
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -45,6 +47,21 @@ pub fn run(
         // let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
 
         let config = Config::new(&config_path);
+        let cache = build_cache();
+
+
+        // cache keeper task to trigger cache updates once in a while
+        let cache_keeper_handle = || {
+            let cache = cache.clone();
+            async move {
+                let mut timer = tokio::time::interval(challenge_cache_update_freq);
+                loop {
+                    timer.tick().await;
+                    cache.run_pending_tasks().await;
+                }
+            }
+        };
+        tokio::spawn(cache_keeper_handle());
 
         // A code to load the EUSign library
         let cert;
@@ -90,6 +107,7 @@ pub fn run(
             config: Arc::new(config),
             cert: Arc::new(cert),
             ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
+            cache
             // aws_sm_client
         };
 
@@ -104,13 +122,13 @@ pub fn run(
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route(
                 "/diia/signature",
-                get(crate::routes::diia_signature::diia_signature),
+                get(crate::routes::diia::signature::handler),
             )
             .route(
                 "/diia/sharing",
-                post(crate::routes::diia_sharing::diia_sharing),
+                post(crate::routes::diia::sharing::handler),
             )
-            .route("/diia/is_user_authorized", get(diia_user_info))
+            .route("/user/is_authorized", get(crate::routes::user::is_authorized::handler))
             .layer(cors)
             .with_state(server_state.clone());
 
@@ -133,9 +151,12 @@ pub fn run(
 #[derive(Clone)]
 pub struct ServerState {
     pub config: Arc<Config>,
+    /// A base64-encoded certificate, matching the private keys.
     pub cert: Arc<String>,
     /// A pointer to the context of the library
     pub ctx: Arc<EusignContext>,
+    /// A cache of (user_id, document_info) pairs
+    pub cache: Cache<String, Arc<DocumentData>>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 
@@ -144,13 +165,17 @@ pub struct ServerState {
 pub struct ServerSubcommand {
     /// HTTPs port the server will listen on.
     #[arg(long, default_value_t = 3000)]
-    https_port: u16,
+    pub https_port: u16,
 
+    /// A path to the config file.
     #[arg(long, default_value_t = String::from("./config.toml"))]
-    config_path: String,
+    pub config_path: String,
     // /// The region on which the AWS is running.
     // #[arg(long, default_value_t = String::from("eu-central-1"))]
     // region: String
+
+    #[arg(long, default_value = "1000", value_parser = parse_duration)]
+    challenge_cache_update_freq: Duration,
 }
 
 /// A helper function for parsing duration.

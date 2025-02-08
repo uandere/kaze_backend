@@ -1,5 +1,4 @@
-pub mod diia_signature;
+pub mod user;
 
-pub mod diia_sharing;
-
-pub mod request_id;
+/// Routes that accept Diia packages
+pub mod diia;

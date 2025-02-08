@@ -1,18 +1,19 @@
-use std::str::from_utf8;
+use std::{str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     utils::{eusign::*, server_error::ServerError},
 };
+use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 #[derive(Deserialize)]
-pub struct DiiaPayload {}
+pub struct Payload {}
 
 #[derive(Serialize)]
-pub struct DiiaResponse {
+pub struct Response {
     success: bool,
 }
 
@@ -22,10 +23,10 @@ pub struct DiiaResponse {
 /// 1. Decrypting the data using EUSignCP library.
 /// 2. Verifying that the data is signed by Diia public certificate.
 /// 3. Storing the data inside the cache.
-pub async fn diia_sharing(
+pub async fn handler(
     State(state): State<ServerState>,
     mut multipart: Multipart,
-) -> Result<Json<DiiaResponse>, ServerError> {
+) -> Result<Json<Response>, ServerError> {
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         // 1) GET THE DATA
         let name = field.name().unwrap_or("<unnamed>").to_string();
@@ -56,9 +57,7 @@ pub async fn diia_sharing(
         // 2) DECRYPT THE DATA
         // Load the EUSignCP library
         // Load all the necessary things
-        let result = unsafe {
-            decrypt_customer_data(&state, customer_data)?
-        };
+        let result = unsafe { decrypt_customer_data(&state, customer_data)? };
 
         info!("The result of the decryption: {}", result);
 
@@ -67,8 +66,18 @@ pub async fn diia_sharing(
         // Deserializing using serde
         let result: DecryptionResult = serde_json::from_str(&result)?;
 
-        
+        // Getting user_id and random seed
+        let mut request_iter = result.request_id.split_whitespace();
+        let user_id = request_iter.next().context("cannot get user ID")?;
+        // Checking if there's seed
+        let _seed = request_iter.next().context("cannot get random seed")?;
+
+        // Getting the actual passport data
+        let passport_data = result.data;
+
+        // Sroring in the cache for now
+        state.cache.insert(user_id.into(), Arc::new(passport_data)).await;
     }
 
-    Ok(Json(DiiaResponse { success: true }))
+    Ok(Json(Response { success: true }))
 }

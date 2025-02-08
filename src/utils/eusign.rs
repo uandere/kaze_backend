@@ -1099,103 +1099,103 @@ unsafe impl Sync for EusignContext {}
 #[derive(Debug, Deserialize)]
 pub struct DecryptionResult {
     #[serde(rename = "requestId")]
-    request_id: String,
+    pub request_id: String,
 
     #[serde(rename = "documentTypes")]
-    document_types: Vec<String>,
+    pub document_types: Vec<String>,
 
-    data: DocumentData,
+    pub data: DocumentData,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DocumentData {
     #[serde(rename = "taxpayer-card")]
-    taxpayer_card: Vec<TaxpayerCard>,
+    pub taxpayer_card: Vec<TaxpayerCard>,
 
     #[serde(rename = "internal-passport")]
-    internal_passport: Vec<InternalPassport>,
+    pub internal_passport: Vec<InternalPassport>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TaxpayerCard {
     #[serde(rename = "creationDate")]
-    creation_date: String,
+    pub creation_date: String,
 
     #[serde(rename = "docNumber")]
-    doc_number: String,
+    pub doc_number: String,
 
     #[serde(rename = "lastNameUA")]
-    last_name_ua: String,
+    pub last_name_ua: String,
 
     #[serde(rename = "firstNameUA")]
-    first_name_ua: String,
+    pub first_name_ua: String,
 
     #[serde(rename = "middleNameUA")]
-    middle_name_ua: String,
+    pub middle_name_ua: String,
 
     #[serde(rename = "birthday")]
-    birthday: String,
+    pub birthday: String,
 
     #[serde(rename = "fileName")]
-    file_name: String,
+    pub file_name: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct InternalPassport {
     #[serde(rename = "taxpayerNumber")]
-    taxpayer_number: String,
+    pub taxpayer_number: String,
 
     #[serde(rename = "residenceUA")]
-    residence_ua: String,
+    pub residence_ua: String,
 
     #[serde(rename = "docNumber")]
-    doc_number: String,
+    pub doc_number: String,
 
     #[serde(rename = "genderUA")]
-    gender_ua: String,
+    pub gender_ua: String,
 
     #[serde(rename = "nationalityUA")]
-    nationality_ua: String,
+    pub nationality_ua: String,
 
     #[serde(rename = "lastNameUA")]
-    last_name_ua: String,
+    pub last_name_ua: String,
 
     #[serde(rename = "firstNameUA")]
-    first_name_ua: String,
+    pub first_name_ua: String,
 
     #[serde(rename = "middleNameUA")]
-    middle_name_ua: String,
+    pub middle_name_ua: String,
 
     #[serde(rename = "birthday")]
-    birthday: String,
+    pub birthday: String,
 
     #[serde(rename = "birthPlaceUA")]
-    birth_place_ua: String,
+    pub birth_place_ua: String,
 
     #[serde(rename = "issueDate")]
-    issue_date: String,
+    pub issue_date: String,
 
     #[serde(rename = "expirationDate")]
-    expiration_date: String,
+    pub expiration_date: String,
 
     #[serde(rename = "recordNumber")]
-    record_number: String,
+    pub record_number: String,
 
     #[serde(rename = "department")]
-    department: String,
+    pub department: String,
 
     #[serde(rename = "genderEN")]
-    gender_en: String,
+    pub gender_en: String,
 
     #[serde(rename = "id")]
-    id: String,
+    pub id: String,
 
     #[serde(rename = "lastNameEN")]
-    last_name_en: String,
+    pub last_name_en: String,
 
     #[serde(rename = "firstNameEN")]
-    first_name_en: String,
+    pub first_name_en: String,
 
     #[serde(rename = "fileName")]
-    file_name: String,
+    pub file_name: String,
 }
