@@ -19,10 +19,13 @@ toml = "0.8.20"
 anyhow = "1.0.95"
 base64 = "0.22.1"
 moka = {version = "0.12.10", features = ["future"]}
-# uuid = { version = "1.12.1", features = ["v7"] }
+typst = "0.12.0"
+chrono = {version = "0.4.39", features = ["serde"]}
+typst-pdf = { version = "0.12.0" }
+
 # aws-config = { version = "1.5.15", features = ["behavior-version-latest"] }
 # aws-sdk-secretsmanager = { version = "1.61.0" }
-# typst-pdf = { version = "0.12.0" }
+
 
 [build-dependencies]
 bindgen = "0.71.0"

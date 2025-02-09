@@ -4,7 +4,7 @@ use crate::{
     commands::server::ServerState,
     utils::{eusign::*, server_error::ServerError},
 };
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
 use tracing::info;
