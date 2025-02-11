@@ -546,3 +546,24 @@
 //////////////////////////////////////////////////
 //                     BODY                     //
 //////////////////////////////////////////////////
+#rental_agreement_place_and_date(place: "Львів", date: datetime(day: 19, month: 11, year: 2024))
+
+#sides_of_agreement(tenant: (initials: "Демчук Назар Ігорович", address_of_residence: "Україна, м. Луцьк, вул. Дружби, 63", passport_data: (series: "-", number: "4323424322", issuing_authority: "3344"), phone_number: "0961234567", email: "tenant@example.com"), landlord: (initials: "Скіра Володимир Васильович", address_of_residence: "Україна, м. Львів, вул. Пимоненка 7к", passport_data: (series: "-", number: "5489939439", issuing_authority: "8754"), phone_number: "0663265785", email: "landlord@example.com"))
+
+#subject_of_agreement(real_estate_data: (type: "квартира", address: "Україна, Львівська обл., м. Львів, Сихівський р-н, вул. Пимоненка 7к", area: 43), ownership_record: (number: "34983948", date: datetime(day: 8, month: 11, year: 2023)))
+
+#rights_and_obligations(rental_payment_delay_limit: 10)
+
+#rental_payment(rental_payment_data: (amount: 600, currency: "USD", destination: "4627055710465997", starting_date: datetime(day: 19, month: 11, year: 2024), payment_day_number: 1))
+
+#agreement_conditions(agreement_conditions_data: (starting_date: datetime(day: 19, month: 11, year: 2024), ending_date: datetime(day: 19, month: 11, year: 2025)))
+
+#responsibility()
+
+#other_conditions(other_conditions_data: (min_notice_days_for_visit: 3, all_tenants: ("Демчук Назар Ігорович", "Самойленко Марта Юріївна"), allowed_animals: ("собака породи Чіхуахуа: 1 шт.", "кіт породи Персицької: 2 шт.")))
+
+#signatures(tenant: (initials: "Демчук Назар Ігорович", address_of_residence: "Україна, м. Луцьк, вул. Дружби, 63", passport_data: (series: "-", number: "4323424322", issuing_authority: "3344"), phone_number: "0963211626", email: "nazar.demchvk@gmail.com"), landlord: (initials: "Скіра Володимир Васильович", address_of_residence: "Україна, м. Львів, вул. Пимоненка 7к", passport_data: (series: "-", number: "5489939439", issuing_authority: "8754"), phone_number: "0663265785", email: "vasylskira@gmail.com"))
+
+#appendix_one(appendix_one_data: (starting_date: datetime(day: 19, month: 11, year: 2024), place: "Львів", tenant_initials: "Демчук Назар Ігорович", landlord_initials: "Скіра Володимир Васильович", additional_property: ("Кондиціонер (AERO 2020)": 2, "Пральна машинка (Philips Wash 2015)": 1), meter_readings: (electricity: (type: "TripleRate", readings: (10, 20, 30)), water: (type: "DualRate", readings: (100, 200)), heating: (type: "SingleRate", readings: (10)), gas: (type: "SingleRate", readings: (10)))))
+
+#appendix_two(appendix_two_data: (starting_date: datetime(day: 19, month: 11, year: 2024), place: "Львів", tenant_initials: "Демчук Назар Ігорович", landlord_initials: "Скіра Володимир Васильович"))

@@ -19,7 +19,7 @@ pub struct Payload {
 
 #[derive(Serialize)]
 pub struct Response {
-    pub pdf: (),
+    pub pdf: String,
 }
 
 /// Generates rental ageement between tenant and landlord.
@@ -46,7 +46,9 @@ pub async fn handler(
         .context("no data found for landlord with specified ID")?;
 
     // generating agreement with all the data
-    let pdf = generate(tenant_data, landlord_data, housing_data).await;
+    // let pdf = generate(tenant_data, landlord_data, housing_data).await;
+
+    let pdf = generate().await?;
 
     Ok(Response { pdf })
 }

@@ -1434,6 +1434,7 @@ dependencies = [
  "clap",
  "http",
  "moka",
+ "regex",
  "serde",
  "serde_json",
  "tokio",

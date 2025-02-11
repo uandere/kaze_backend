@@ -1,13 +1,14 @@
 use super::{eusign::DocumentData, server_error::ServerError};
 use crate::routes::agreement::generate::HousingData;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
+use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-///////////////////////////
-// Custom Serde Error   //
-///////////////////////////
+/////////////////////////////////////
+//   1) Custom Serde Error         //
+/////////////////////////////////////
 
 #[derive(Debug)]
 pub enum TypstSerError {
@@ -30,63 +31,58 @@ impl serde::ser::Error for TypstSerError {
     }
 }
 
-//////////////////////////////
-// Custom Typst Serializer //
-//////////////////////////////
+/////////////////////////////////////
+//  2) Custom Typst Serializer     //
+/////////////////////////////////////
 
-/// Convert a `T` (which implements `Serialize`) into a Typst-style string.
-///
-/// Examples of the output format:
-/// - For structs and maps: `( key: val, key: val, )`
-/// - For lists: `( val, val, )`
-/// - For strings: `"some string"`
-/// - For numbers: `123`
-///
-/// Special handling:
-/// - `DateTime<Utc>` will be serialized as `datetime(day: X, month: Y, year: Z)`.
+/// Convert a `T` (which implements `Serialize`) into a Typst‐style string.
+/// **Then** do a small post‐processing step to remove quotes around `datetime(...)`.
 pub fn to_typst_string<T>(value: &T) -> Result<String, TypstSerError>
 where
     T: Serialize,
 {
     let mut serializer = TypstSerializer::new();
     value.serialize(&mut serializer)?;
-    Ok(serializer.output)
+    let mut result = serializer.output;
+
+    // Post‐processing: remove quotes around any "datetime(...)" strings using regex
+    let re = Regex::new(r#""datetime\((.*?)\)""#).unwrap();
+    result = re.replace_all(&result, "datetime($1)").to_string();
+
+    Ok(result)
 }
 
-/// A custom `Serializer` implementing `serde::Serializer` to produce Typst-friendly text.
+/// Internal struct that accumulates the output during serialization.
 struct TypstSerializer {
-    /// The output string we build up as we serialize.
-    output: String,
-    /// For controlling indentation, depth, etc. if needed.
-    level: usize,
+    pub output: String,
+    pub level: usize,
 }
 
 impl TypstSerializer {
     fn new() -> Self {
-        TypstSerializer {
+        Self {
             output: String::new(),
             level: 0,
         }
     }
-
     fn _indent(&mut self) {
-        // Indentation
         for _ in 0..self.level {
             self.output.push_str("  ");
         }
     }
 }
 
-///////////////////////////////
-// Implement `serde::Serializer`
-///////////////////////////////
 use serde::ser::{
     SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
     SerializeTupleStruct, SerializeTupleVariant, Serializer,
 };
 
+////////////////////////////////////////
+//  3) Implement `Serializer`         //
+////////////////////////////////////////
+
 impl<'a> Serializer for &'a mut TypstSerializer {
-    // ========== Associated Types =============
+    // Required associated types:
     type Ok = ();
     type Error = TypstSerError;
 
@@ -98,8 +94,7 @@ impl<'a> Serializer for &'a mut TypstSerializer {
     type SerializeStruct = StructCompound<'a>;
     type SerializeStructVariant = StructVariantCompound<'a>;
 
-    // ========== Primitive types =============
-
+    // ---- Primitives ----
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
         self.output += if v { "true" } else { "false" };
         Ok(())
@@ -109,106 +104,88 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
         self.output += &v.to_string();
         Ok(())
     }
-
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
-        // Just treat as a string
         self.output.push('"');
         self.output.push(v);
         self.output.push('"');
         Ok(())
     }
-
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        // For safety, always quote strings in Typst
+        // Always quote strings in Typst:
         self.output.push('"');
         self.output += v;
         self.output.push('"');
         Ok(())
     }
-
     fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok, Self::Error> {
         Err(TypstSerError::Message(
-            "serialize_bytes not supported".to_owned(),
+            "serialize_bytes not supported".to_string(),
         ))
     }
 
-    // ========== "Optional" types =============
-
+    // ---- Option ----
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
         self.output += "null";
         Ok(())
     }
-
     fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<Self::Ok, Self::Error> {
         value.serialize(self)
     }
-
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        // Usually "null" is how we represent a unit
         self.output += "null";
         Ok(())
     }
-
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+        // For unit structs, also "null"
         self.output += "null";
         Ok(())
     }
-
     fn serialize_unit_variant(
         self,
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        // Just output the variant as a string
         self.output.push_str(variant);
         Ok(())
     }
-
     fn serialize_newtype_struct<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
@@ -216,7 +193,6 @@ impl<'a> Serializer for &'a mut TypstSerializer {
     ) -> Result<Self::Ok, Self::Error> {
         value.serialize(self)
     }
-
     fn serialize_newtype_variant<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
@@ -224,16 +200,13 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         variant: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error> {
-        // e.g. variant: value
         self.output.push_str(variant);
         self.output.push_str(": ");
         value.serialize(self)
     }
 
-    // ========== seq, tuple, map, struct =============
-
+    // ---- Seq/Tuple/Map/Struct ----
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        // We'll produce a parenthesized list: ( item1, item2, )
         self.output.push('(');
         Ok(Compound {
             ser: self,
@@ -241,11 +214,9 @@ impl<'a> Serializer for &'a mut TypstSerializer {
             is_map: false,
         })
     }
-
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         self.serialize_seq(Some(len))
     }
-
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
@@ -253,7 +224,6 @@ impl<'a> Serializer for &'a mut TypstSerializer {
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_seq(Some(len))
     }
-
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -261,7 +231,6 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        // variant: ( items, )
         self.output.push_str(variant);
         self.output.push_str(": (");
         Ok(VariantCompound {
@@ -269,9 +238,7 @@ impl<'a> Serializer for &'a mut TypstSerializer {
             first: true,
         })
     }
-
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        // We'll produce ( key: value, key: value, )
         self.output.push('(');
         Ok(Compound {
             ser: self,
@@ -279,20 +246,17 @@ impl<'a> Serializer for &'a mut TypstSerializer {
             is_map: true,
         })
     }
-
     fn serialize_struct(
         self,
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        // Same approach as map
         self.output.push('(');
         Ok(StructCompound {
             ser: self,
             first: true,
         })
     }
-
     fn serialize_struct_variant(
         self,
         _name: &'static str,
@@ -300,7 +264,6 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        // variant: ( key: value, key: value, )
         self.output.push_str(variant);
         self.output.push_str(": (");
         Ok(StructVariantCompound {
@@ -310,7 +273,9 @@ impl<'a> Serializer for &'a mut TypstSerializer {
     }
 }
 
-// "Compound" used by seq or map
+////////////////////////////////////
+// 4) Seq/Tuple/Map/Struct Helpers
+////////////////////////////////////
 struct Compound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
@@ -329,8 +294,7 @@ impl<'a> SerializeSeq for Compound<'a> {
         value.serialize(&mut *self.ser)?;
         Ok(())
     }
-
-    fn end(self) -> Result<Self::Ok, TypstSerError> {
+    fn end(self) -> Result<(), TypstSerError> {
         self.ser.output.push(')');
         Ok(())
     }
@@ -343,8 +307,7 @@ impl<'a> SerializeTuple for Compound<'a> {
     fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), TypstSerError> {
         SerializeSeq::serialize_element(self, value)
     }
-
-    fn end(self) -> Result<Self::Ok, TypstSerError> {
+    fn end(self) -> Result<(), TypstSerError> {
         SerializeSeq::end(self)
     }
 }
@@ -356,13 +319,11 @@ impl<'a> SerializeTupleStruct for Compound<'a> {
     fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), TypstSerError> {
         SerializeSeq::serialize_element(self, value)
     }
-
-    fn end(self) -> Result<Self::Ok, TypstSerError> {
+    fn end(self) -> Result<(), TypstSerError> {
         SerializeSeq::end(self)
     }
 }
 
-/// For a "map" in Typst, we want `( key: value, key: value, )`.
 impl<'a> SerializeMap for Compound<'a> {
     type Ok = ();
     type Error = TypstSerError;
@@ -372,16 +333,14 @@ impl<'a> SerializeMap for Compound<'a> {
             self.ser.output.push_str(", ");
         }
         self.first = false;
-        // Key should be a string or something. We'll buffer it in a small sub‐serializer, then remove quotes.
+
+        // Key is presumably a string -> we do NOT strip quotes now.
+        // Instead, we keep them so that we get e.g. ("some key": 123).
         let mut key_buf = TypstSerializer::new();
         key.serialize(&mut key_buf)?;
-        // The result might be `"somekey"`. We want to strip quotes if it's a simple string.
-        let raw_key = key_buf.output.trim();
-        if raw_key.starts_with('"') && raw_key.ends_with('"') && raw_key.len() >= 2 {
-            self.ser.output.push_str(&raw_key[1..raw_key.len() - 1]);
-        } else {
-            self.ser.output.push_str(raw_key);
-        }
+        // e.g. key_buf.output might be `"Кондиціонер (AERO 2020)"`
+        // We want that exactly.
+        self.ser.output.push_str(&key_buf.output);
         self.ser.output.push_str(": ");
         Ok(())
     }
@@ -391,18 +350,16 @@ impl<'a> SerializeMap for Compound<'a> {
         Ok(())
     }
 
-    fn end(self) -> Result<Self::Ok, TypstSerError> {
+    fn end(self) -> Result<(), TypstSerError> {
         self.ser.output.push(')');
         Ok(())
     }
 }
 
-// For a variant: variant: ( items, )
 struct VariantCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
 }
-
 impl<'a> SerializeTupleVariant for VariantCompound<'a> {
     type Ok = ();
     type Error = TypstSerError;
@@ -415,14 +372,12 @@ impl<'a> SerializeTupleVariant for VariantCompound<'a> {
         value.serialize(&mut *self.ser)?;
         Ok(())
     }
-
     fn end(self) -> Result<(), TypstSerError> {
         self.ser.output.push(')');
         Ok(())
     }
 }
 
-// For a struct: ( field: value, field: value, )
 struct StructCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
@@ -435,7 +390,7 @@ impl<'a> SerializeStruct for StructCompound<'a> {
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<Self::Ok, TypstSerError> {
+    ) -> Result<(), TypstSerError> {
         if !self.first {
             self.ser.output.push_str(", ");
         }
@@ -445,14 +400,12 @@ impl<'a> SerializeStruct for StructCompound<'a> {
         value.serialize(&mut *self.ser)?;
         Ok(())
     }
-
-    fn end(self) -> Result<Self::Ok, TypstSerError> {
+    fn end(self) -> Result<(), TypstSerError> {
         self.ser.output.push(')');
         Ok(())
     }
 }
 
-// For a struct variant: variant: ( field: value, ... )
 struct StructVariantCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
@@ -475,19 +428,16 @@ impl<'a> SerializeStructVariant for StructVariantCompound<'a> {
         value.serialize(&mut *self.ser)?;
         Ok(())
     }
-
     fn end(self) -> Result<(), TypstSerError> {
         self.ser.output.push(')');
         Ok(())
     }
 }
 
-///////////////////////////////////////
-// Special handling for DateTime<Utc} //
-///////////////////////////////////////
+//////////////////////////////////////////////
+// 5) Special handling for DateTime<Utc>    //
+//////////////////////////////////////////////
 
-/// We want `DateTime<Utc>` to become s.l. `datetime(day: 19, month: 11, year: 2024)`,
-/// so we define a newtype wrapper and implement `Serialize` manually:
 #[derive(Debug, Clone)]
 pub struct TypstDateTime(pub DateTime<Utc>);
 
@@ -496,18 +446,19 @@ impl Serialize for TypstDateTime {
     where
         S: serde::Serializer,
     {
-        // Format as datetime(day: X, month: Y, year: Z)
         let day = self.0.day();
         let month = self.0.month();
         let year = self.0.year();
+        // We'll store as "datetime(day: X, month: Y, year: Z)" in quotes,
+        // then do a .replace(...) to remove them.
         let s = format!("datetime(day: {}, month: {}, year: {})", day, month, year);
         serializer.serialize_str(&s)
     }
 }
 
-////////////////////////////////////////////////////////////
-// Now define the data structs in CamelCase, deriving Serialize
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////
+// 6) Data Structures in CamelCase + `type` //
+//////////////////////////////////////////////
 
 #[derive(Serialize)]
 pub struct RentalAgreementTitle {
@@ -518,6 +469,33 @@ pub struct RentalAgreementTitle {
 pub struct RentalAgreementPlaceAndDate {
     pub place: String,
     pub date: TypstDateTime,
+}
+
+/// Example of r#type so it serializes as `type: "..."`
+#[derive(Serialize)]
+pub struct RealEstateData {
+    #[serde(rename = "type")]
+    pub r#type: String,
+
+    pub address: String,
+    pub area: f32,
+}
+
+/// For meter reading, same approach with r#type => `type: "..."
+#[derive(Serialize)]
+pub struct MeterReadingData {
+    #[serde(rename = "type")]
+    pub r#type: String,
+
+    pub readings: Vec<f32>,
+}
+
+#[derive(Serialize)]
+pub struct MeterReadings {
+    pub electricity: MeterReadingData,
+    pub water: MeterReadingData,
+    pub heating: MeterReadingData,
+    pub gas: MeterReadingData,
 }
 
 #[derive(Serialize)]
@@ -540,13 +518,6 @@ pub struct PersonData {
 pub struct SidesOfAgreement {
     pub tenant: PersonData,
     pub landlord: PersonData,
-}
-
-#[derive(Serialize)]
-pub struct RealEstateData {
-    pub property_type: String,
-    pub address: String,
-    pub area: f32,
 }
 
 #[derive(Serialize)]
@@ -591,9 +562,19 @@ pub struct AgreementConditions {
     pub agreement_conditions_data: AgreementConditionsData,
 }
 
-/// No fields needed
-#[derive(Serialize)]
+/// Manually implement so #responsibility() not #responsibilitynull
 pub struct Responsibility;
+
+impl Serialize for Responsibility {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Empty struct => ( )
+        let mut st = serializer.serialize_struct("Responsibility", 0)?;
+        st.end()
+    }
+}
 
 #[derive(Serialize)]
 pub struct OtherConditionsData {
@@ -611,20 +592,6 @@ pub struct OtherConditions {
 pub struct Signatures {
     pub tenant: PersonData,
     pub landlord: PersonData,
-}
-
-#[derive(Serialize)]
-pub struct MeterReadingData {
-    pub reading_type: String,
-    pub readings: Vec<f32>,
-}
-
-#[derive(Serialize)]
-pub struct MeterReadings {
-    pub electricity: MeterReadingData,
-    pub water: MeterReadingData,
-    pub heating: MeterReadingData,
-    pub gas: MeterReadingData,
 }
 
 #[derive(Serialize)]
@@ -655,34 +622,26 @@ pub struct AppendixTwo {
     pub appendix_two_data: AppendixTwoData,
 }
 
-///////////////////////////////////////////////////////////
-// A small trait: each "function struct" can produce:
-// #function_name(
-//   <serialized fields>
-// )
-///////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+// 7) The FunctionCall trait to produce #function_name(...)
+////////////////////////////////////////////////////////////
 
 pub trait FunctionCall {
-    /// Return the **Typst function name** (without `#`).
     fn function_name(&self) -> &'static str;
-
-    /// Convert to full `#function_name(...)` string in Typst syntax.
     fn to_typst(&self) -> Result<String, TypstSerError>;
 }
 
-// Example for `RentalAgreementTitle`:
+// Each "function" struct implements FunctionCall.
+
 impl FunctionCall for RentalAgreementTitle {
     fn function_name(&self) -> &'static str {
         "rental_agreement_title"
     }
-
     fn to_typst(&self) -> Result<String, TypstSerError> {
-        let body = to_typst_string(self)?; // e.g. `( rental_agreement_number: 123 )`
+        let body = to_typst_string(self)?; // e.g. (rental_agreement_number: 42)
         Ok(format!("#{}{}\n", self.function_name(), body))
     }
 }
-
-// And so on for the others that represent direct function calls.
 
 impl FunctionCall for RentalAgreementPlaceAndDate {
     fn function_name(&self) -> &'static str {
@@ -744,13 +703,14 @@ impl FunctionCall for AgreementConditions {
     }
 }
 
+// For `Responsibility`, we know it's effectively empty:
 impl FunctionCall for Responsibility {
     fn function_name(&self) -> &'static str {
         "responsibility"
     }
     fn to_typst(&self) -> Result<String, TypstSerError> {
-        let body = to_typst_string(self)?; // Should be "()"
-        Ok(format!("#{}{}\n", self.function_name(), body))
+        // We want "#responsibility()"
+        Ok(format!("#responsibility()\n"))
     }
 }
 
@@ -794,12 +754,13 @@ impl FunctionCall for AppendixTwo {
     }
 }
 
-/// Example function that might generate your final Typst code.
-pub async fn generate(
-    _tenant_data: Arc<DocumentData>,
-    _landlord_data: Arc<DocumentData>,
-    _housing_data: HousingData,
-) -> Result<(), ServerError> {
+////////////////////////////////////////////////////////////////
+// 8) Example usage: build & return final Typst calls string  //
+////////////////////////////////////////////////////////////////
+
+/// Example function. In your real code, you'd pass in `_tenant_data`, etc.
+pub async fn generate() -> Result<String, ServerError> {
+    // 1) RentalAgreementTitle
     let fun_title = RentalAgreementTitle {
         rental_agreement_number: 42,
     };
@@ -807,7 +768,6 @@ pub async fn generate(
     // 2) RentalAgreementPlaceAndDate
     let fun_place_and_date = RentalAgreementPlaceAndDate {
         place: "Львів".to_string(),
-        // Using with_ymd_and_hms
         date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
     };
 
@@ -844,7 +804,7 @@ pub async fn generate(
     // 4) SubjectOfAgreement
     let fun_subject = SubjectOfAgreement {
         real_estate_data: RealEstateData {
-            property_type: "квартира".to_string(),
+            r#type: "квартира".to_string(),
             address: "Україна, Львівська обл., м. Львів, Сихівський р-н, вул. Пимоненка 7к"
                 .to_string(),
             area: 43.0,
@@ -874,7 +834,9 @@ pub async fn generate(
     // 7) AgreementConditions
     let fun_agreement_conditions = AgreementConditions {
         agreement_conditions_data: AgreementConditionsData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
+            starting_date: TypstDateTime(
+                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
+            ),
             ending_date: TypstDateTime(Utc.with_ymd_and_hms(2025, 11, 19, 0, 0, 0).unwrap()),
         },
     };
@@ -925,31 +887,36 @@ pub async fn generate(
 
     // 11) AppendixOne
     let mut additional_property = HashMap::new();
-    additional_property.insert("Пральна машинка (Philips Wash 2015)".to_string(), 1);
+    additional_property.insert(
+        "Пральна машинка (Philips Wash 2015)".to_string(),
+        1,
+    );
     additional_property.insert("Кондиціонер (AERO 2020)".to_string(), 2);
 
     let fun_appendix_one = AppendixOne {
         appendix_one_data: AppendixOneData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
+            starting_date: TypstDateTime(
+                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
+            ),
             place: "Львів".to_string(),
             tenant_initials: "Демчук Назар Ігорович".to_string(),
             landlord_initials: "Скіра Володимир Васильович".to_string(),
             additional_property,
             meter_readings: MeterReadings {
                 electricity: MeterReadingData {
-                    reading_type: "TripleRate".to_string(),
+                    r#type: "TripleRate".to_string(),
                     readings: vec![10.0, 20.0, 30.0],
                 },
                 water: MeterReadingData {
-                    reading_type: "DualRate".to_string(),
+                    r#type: "DualRate".to_string(),
                     readings: vec![100.0, 200.0],
                 },
                 heating: MeterReadingData {
-                    reading_type: "SingleRate".to_string(),
+                    r#type: "SingleRate".to_string(),
                     readings: vec![10.0],
                 },
                 gas: MeterReadingData {
-                    reading_type: "SingleRate".to_string(),
+                    r#type: "SingleRate".to_string(),
                     readings: vec![10.0],
                 },
             },
@@ -959,39 +926,39 @@ pub async fn generate(
     // 12) AppendixTwo
     let fun_appendix_two = AppendixTwo {
         appendix_two_data: AppendixTwoData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
+            starting_date: TypstDateTime(
+                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
+            ),
             place: "Львів".to_string(),
             tenant_initials: "Демчук Назар Ігорович".to_string(),
             landlord_initials: "Скіра Володимир Васильович".to_string(),
         },
     };
 
-    // Now generate each function call in Typst syntax (e.g. "#function(...)\n")
+    // Generate each function call
     let calls = vec![
-        fun_title.to_typst().unwrap(),
-        fun_place_and_date.to_typst().unwrap(),
-        fun_sides.to_typst().unwrap(),
-        fun_subject.to_typst().unwrap(),
-        fun_rights_and_obligations.to_typst().unwrap(),
-        fun_rental_payment.to_typst().unwrap(),
-        fun_agreement_conditions.to_typst().unwrap(),
-        fun_responsibility.to_typst().unwrap(),
-        fun_other_conditions.to_typst().unwrap(),
-        fun_signatures.to_typst().unwrap(),
-        fun_appendix_one.to_typst().unwrap(),
-        fun_appendix_two.to_typst().unwrap(),
+        fun_title.to_typst()?,
+        fun_place_and_date.to_typst()?,
+        fun_sides.to_typst()?,
+        fun_subject.to_typst()?,
+        fun_rights_and_obligations.to_typst()?,
+        fun_rental_payment.to_typst()?,
+        fun_agreement_conditions.to_typst()?,
+        fun_responsibility.to_typst()?,
+        fun_other_conditions.to_typst()?,
+        fun_signatures.to_typst()?,
+        fun_appendix_one.to_typst()?,
+        fun_appendix_two.to_typst()?,
     ];
 
-    // Combine them  all into one big string
+    // Combine them into one big string
     let all_calls = calls.join("\n");
 
-    // let mut template = std::fs::read_to_string("resources/typst/rental_agreement_template.typ")
-    //     .unwrap("Could not read base template");
+    // Optionally, read your template and append `all_calls` at the end.
+    // let mut template = std::fs::read_to_string("resources/typst/rental_agreement_template.typ")?;
     // template.push_str("\n//////////////////////////////////////////////////\n// BODY //\n//////////////////////////////////////////////////\n");
     // template.push_str(&all_calls);
-    // return template;
+    // Ok(template)
 
-    println!("{}", all_calls);
-
-    Ok(())
+    Ok(all_calls)
 }
