@@ -12,7 +12,7 @@ use crate::{
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
-    pub housing_data: HousingData,
+    // pub housing_data: HousingData,
 }
 
 #[derive(Serialize)]
@@ -21,14 +21,15 @@ pub struct Response {
 }
 
 /// Generates rental ageement between tenant and landlord.
+#[axum::debug_handler]
 pub async fn handler(
     State(state): State<ServerState>,
     Json(Payload {
         tenant_id,
         landlord_id,
-        housing_data,
+        // housing_data,
     }): Json<Payload>,
-) -> Result<Response, ServerError> {
+) -> Result<Json<Response>, ServerError> {
     // getting tenant data from the cache
     let tenant_data = state
         .cache
@@ -47,9 +48,9 @@ pub async fn handler(
     // let pdf = generate(tenant_data, landlord_data, housing_data).await;
 
     // TODO: not pass default
-    let pdf = generate(&state, tenant_data, landlord_data, housing_data, Default::default()).await?;
+    let pdf = generate(&state, tenant_data, landlord_data, Default::default(), Default::default()).await?;
 
     tokio::fs::write("output.typ", pdf.clone()).await?;
 
-    Ok(Response { pdf })
+    Ok(Json(Response { pdf }))
 }

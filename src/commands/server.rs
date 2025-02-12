@@ -134,6 +134,10 @@ pub fn run(
                 post(crate::routes::diia::sharing::handler),
             )
             .route("/user/is_authorized", get(crate::routes::user::is_authorized::handler))
+            .route(
+                "/agreement/generate",
+                post(crate::routes::agreement::generate::handler),
+            )
             .layer(cors)
             .with_state(server_state.clone());
 
