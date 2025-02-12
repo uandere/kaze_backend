@@ -48,7 +48,7 @@ pub async fn handler(
     // generating agreement with all the data
     // let pdf = generate(tenant_data, landlord_data, housing_data).await;
 
-    let pdf = generate().await?;
+    let pdf = generate(&state, tenant_data, landlord_data, housing_data).await?;
 
     Ok(Response { pdf })
 }

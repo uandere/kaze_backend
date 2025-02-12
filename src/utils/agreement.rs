@@ -1,5 +1,5 @@
 use super::{eusign::DocumentData, server_error::ServerError};
-use crate::routes::agreement::generate::HousingData;
+use crate::{commands::server::ServerState, routes::agreement::generate::HousingData};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use regex::Regex;
 use serde::Serialize;
@@ -55,18 +55,18 @@ where
 /// Internal struct that accumulates the output during serialization.
 struct TypstSerializer {
     pub output: String,
-    pub level: usize,
+    pub _level: usize,
 }
 
 impl TypstSerializer {
     fn new() -> Self {
         Self {
             output: String::new(),
-            level: 0,
+            _level: 0,
         }
     }
     fn _indent(&mut self) {
-        for _ in 0..self.level {
+        for _ in 0..self._level {
             self.output.push_str("  ");
         }
     }
@@ -211,7 +211,7 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         Ok(Compound {
             ser: self,
             first: true,
-            is_map: false,
+            _is_map: false,
         })
     }
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
@@ -243,7 +243,7 @@ impl<'a> Serializer for &'a mut TypstSerializer {
         Ok(Compound {
             ser: self,
             first: true,
-            is_map: true,
+            _is_map: true,
         })
     }
     fn serialize_struct(
@@ -279,7 +279,7 @@ impl<'a> Serializer for &'a mut TypstSerializer {
 struct Compound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
-    is_map: bool,
+    _is_map: bool,
 }
 
 impl<'a> SerializeSeq for Compound<'a> {
@@ -571,7 +571,7 @@ impl Serialize for Responsibility {
         S: Serializer,
     {
         // Empty struct => ( )
-        let mut st = serializer.serialize_struct("Responsibility", 0)?;
+        let st = serializer.serialize_struct("Responsibility", 0)?;
         st.end()
     }
 }
@@ -759,7 +759,12 @@ impl FunctionCall for AppendixTwo {
 ////////////////////////////////////////////////////////////////
 
 /// Example function. In your real code, you'd pass in `_tenant_data`, etc.
-pub async fn generate() -> Result<String, ServerError> {
+pub async fn generate(
+    _state: &ServerState,
+    _tenant_data: Arc<DocumentData>,
+    _landlord_data: Arc<DocumentData>,
+    _housing_data: HousingData,
+) -> Result<String, ServerError> {
     // 1) RentalAgreementTitle
     let fun_title = RentalAgreementTitle {
         rental_agreement_number: 42,
@@ -834,9 +839,7 @@ pub async fn generate() -> Result<String, ServerError> {
     // 7) AgreementConditions
     let fun_agreement_conditions = AgreementConditions {
         agreement_conditions_data: AgreementConditionsData {
-            starting_date: TypstDateTime(
-                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
-            ),
+            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
             ending_date: TypstDateTime(Utc.with_ymd_and_hms(2025, 11, 19, 0, 0, 0).unwrap()),
         },
     };
@@ -887,17 +890,12 @@ pub async fn generate() -> Result<String, ServerError> {
 
     // 11) AppendixOne
     let mut additional_property = HashMap::new();
-    additional_property.insert(
-        "Пральна машинка (Philips Wash 2015)".to_string(),
-        1,
-    );
+    additional_property.insert("Пральна машинка (Philips Wash 2015)".to_string(), 1);
     additional_property.insert("Кондиціонер (AERO 2020)".to_string(), 2);
 
     let fun_appendix_one = AppendixOne {
         appendix_one_data: AppendixOneData {
-            starting_date: TypstDateTime(
-                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
-            ),
+            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
             place: "Львів".to_string(),
             tenant_initials: "Демчук Назар Ігорович".to_string(),
             landlord_initials: "Скіра Володимир Васильович".to_string(),
@@ -926,9 +924,7 @@ pub async fn generate() -> Result<String, ServerError> {
     // 12) AppendixTwo
     let fun_appendix_two = AppendixTwo {
         appendix_two_data: AppendixTwoData {
-            starting_date: TypstDateTime(
-                Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap(),
-            ),
+            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
             place: "Львів".to_string(),
             tenant_initials: "Демчук Назар Ігорович".to_string(),
             landlord_initials: "Скіра Володимир Васильович".to_string(),

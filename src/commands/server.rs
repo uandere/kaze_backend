@@ -16,6 +16,7 @@ use axum_server::Handle;
 use clap::Parser;
 use http::Method;
 use moka::future::Cache;
+use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
@@ -29,7 +30,8 @@ pub fn run(
         https_port,
         config_path,
         // region,
-        challenge_cache_update_freq
+        challenge_cache_update_freq,
+        agreement_template_path
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -102,12 +104,15 @@ pub fn run(
             
         }
 
+        let agreement_template_string = Arc::new(read_to_string(agreement_template_path).await?);
+
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
             cert: Arc::new(cert),
             ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
-            cache
+            cache,
+            agreement_template_string
             // aws_sm_client
         };
 
@@ -150,6 +155,7 @@ pub fn run(
 /// A state of the server.
 #[derive(Clone)]
 pub struct ServerState {
+    /// A config of the server
     pub config: Arc<Config>,
     /// A base64-encoded certificate, matching the private keys.
     pub cert: Arc<String>,
@@ -157,6 +163,8 @@ pub struct ServerState {
     pub ctx: Arc<EusignContext>,
     /// A cache of (user_id, document_info) pairs
     pub cache: Cache<String, Arc<DocumentData>>,
+    /// A string which contains a Typst template for the agreeement.
+    pub agreement_template_string: Arc<String>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 
@@ -170,12 +178,18 @@ pub struct ServerSubcommand {
     /// A path to the config file.
     #[arg(long, default_value_t = String::from("./config.toml"))]
     pub config_path: String,
-    // /// The region on which the AWS is running.
-    // #[arg(long, default_value_t = String::from("eu-central-1"))]
-    // region: String
+
 
     #[arg(long, default_value = "1000", value_parser = parse_duration)]
     challenge_cache_update_freq: Duration,
+
+    /// A path to the config file.
+    #[arg(long, default_value_t = String::from("./resources/typst/rental_agreement_template.typ"))]
+    pub agreement_template_path: String,
+
+    // /// The region on which the AWS is running.
+    // #[arg(long, default_value_t = String::from("eu-central-1"))]
+    // region: String
 }
 
 /// A helper function for parsing duration.
