@@ -1117,6 +1117,16 @@ pub struct DocumentData {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DocumentUnit {
+    #[serde(rename = "taxpayer-card")]
+    pub taxpayer_card: TaxpayerCard,
+
+
+    #[serde(rename = "internal-passport")]
+    pub internal_passport: InternalPassport,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct TaxpayerCard {
     #[serde(rename = "creationDate")]
     pub creation_date: String,
@@ -1140,7 +1150,7 @@ pub struct TaxpayerCard {
     pub file_name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct InternalPassport {
     #[serde(rename = "taxpayerNumber")]
     pub taxpayer_number: String,

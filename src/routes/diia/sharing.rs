@@ -4,7 +4,7 @@ use crate::{
     commands::server::ServerState,
     utils::{eusign::*, server_error::ServerError},
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -73,10 +73,30 @@ pub async fn handler(
         let _seed = request_iter.next().context("cannot get random seed")?;
 
         // Getting the actual passport data
-        let passport_data = result.data;
+        let data = result.data;
+
+        let taxpayer_card = data
+        .taxpayer_card
+        .into_iter()
+        .next()
+        .ok_or(anyhow!("No passport found"))?;
+
+        let internal_passport = data
+        .internal_passport
+        .into_iter()
+        .next()
+        .ok_or(anyhow!("No passport found"))?;
+
+
+        let unit = DocumentUnit {
+            taxpayer_card,
+            internal_passport,
+        };
 
         // Sroring in the cache for now
-        state.cache.insert(user_id.into(), Arc::new(passport_data)).await;
+        state.cache.insert(user_id.into(), Arc::new(unit)).await;
+
+        info!("Added user with id={user_id} to the cache!");
     }
 
     Ok(Json(Response { success: true }))

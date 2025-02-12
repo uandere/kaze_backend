@@ -162,7 +162,7 @@ pub struct ServerState {
     /// A pointer to the context of the library
     pub ctx: Arc<EusignContext>,
     /// A cache of (user_id, document_info) pairs
-    pub cache: Cache<String, Arc<DocumentData>>,
+    pub cache: Cache<String, Arc<DocumentUnit>>,
     /// A string which contains a Typst template for the agreeement.
     pub agreement_template_string: Arc<String>,
     // aws_sm_client: aws_sdk_secretsmanager::Client

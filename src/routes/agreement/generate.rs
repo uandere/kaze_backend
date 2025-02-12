@@ -4,11 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     commands::server::ServerState,
-    utils::{agreement::generate, server_error::ServerError},
+    utils::{agreement::{generate, HousingData}, server_error::ServerError},
 };
 
-#[derive(Deserialize)]
-pub struct HousingData {}
 
 #[derive(Deserialize)]
 pub struct Payload {
@@ -48,7 +46,10 @@ pub async fn handler(
     // generating agreement with all the data
     // let pdf = generate(tenant_data, landlord_data, housing_data).await;
 
-    let pdf = generate(&state, tenant_data, landlord_data, housing_data).await?;
+    // TODO: not pass default
+    let pdf = generate(&state, tenant_data, landlord_data, housing_data, Default::default()).await?;
+
+    tokio::fs::write("output.typ", pdf.clone()).await?;
 
     Ok(Response { pdf })
 }

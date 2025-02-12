@@ -1,8 +1,10 @@
-use super::{eusign::DocumentData, server_error::ServerError};
-use crate::{commands::server::ServerState, routes::agreement::generate::HousingData};
-use chrono::{DateTime, Datelike, TimeZone, Utc};
+use super::{eusign::DocumentUnit, server_error::ServerError};
+use crate::commands::server::ServerState;
+use anyhow::anyhow;
+use chrono::{DateTime, Datelike, Days, NaiveDateTime, TimeZone, Utc};
+use chrono_tz::{Europe::Kyiv, Tz};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -435,11 +437,11 @@ impl<'a> SerializeStructVariant for StructVariantCompound<'a> {
 }
 
 //////////////////////////////////////////////
-// 5) Special handling for DateTime<Utc>    //
+// 5) Special handling for DateTime<Tz>    //
 //////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct TypstDateTime(pub DateTime<Utc>);
+pub struct TypstDateTime(pub DateTime<Tz>);
 
 impl Serialize for TypstDateTime {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -462,7 +464,7 @@ impl Serialize for TypstDateTime {
 
 #[derive(Serialize)]
 pub struct RentalAgreementTitle {
-    pub rental_agreement_number: i32,
+    pub rental_agreement_number: u64,
 }
 
 #[derive(Serialize)]
@@ -478,7 +480,7 @@ pub struct RealEstateData {
     pub r#type: String,
 
     pub address: String,
-    pub area: f32,
+    pub area: u64,
 }
 
 /// For meter reading, same approach with r#type => `type: "..."
@@ -534,16 +536,16 @@ pub struct SubjectOfAgreement {
 
 #[derive(Serialize)]
 pub struct RightsAndObligations {
-    pub rental_payment_delay_limit: i32,
+    pub rental_payment_delay_limit: u8,
 }
 
 #[derive(Serialize)]
 pub struct RentalPaymentData {
-    pub amount: f32,
+    pub amount: u64,
     pub currency: String,
     pub destination: String,
     pub starting_date: TypstDateTime,
-    pub payment_day_number: i32,
+    pub payment_day_number: u8,
 }
 
 #[derive(Serialize)]
@@ -578,7 +580,7 @@ impl Serialize for Responsibility {
 
 #[derive(Serialize)]
 pub struct OtherConditionsData {
-    pub min_notice_days_for_visit: i32,
+    pub min_notice_days_for_visit: u8,
     pub all_tenants: Vec<String>,
     pub allowed_animals: Vec<String>,
 }
@@ -600,7 +602,7 @@ pub struct AppendixOneData {
     pub place: String,
     pub tenant_initials: String,
     pub landlord_initials: String,
-    pub additional_property: HashMap<String, i32>,
+    pub additional_property: HashMap<String, u64>,
     pub meter_readings: MeterReadings,
 }
 
@@ -754,51 +756,116 @@ impl FunctionCall for AppendixTwo {
     }
 }
 
+#[derive(Deserialize, Default)]
+pub struct HousingData {
+    address: HousingDataAddress,
+    r#type: String,
+    area: u64,
+}
+
+#[derive(Deserialize, Default)]
+pub struct HousingDataAddress {
+    region: String,
+    city: String,
+    district: String,
+    street: String,
+    apartment_number: String,
+}
+
+impl HousingDataAddress {
+    pub fn full_address(&self) -> String {
+        "Україна".to_string() + ", " +
+        &self.region + " обл., " + 
+        "м. " + &self.city + ", " + 
+        &self.district + " р-н, " + 
+        "вул. " + &self.street + " " + 
+        &self.apartment_number
+    }
+}
+
+#[derive(Deserialize, Default)]
+pub struct RentData {
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime,
+    pub currency: String,
+    pub price: u64,
+    pub rental_payment_delay_limit: u8,
+    pub destination: String,
+    pub payment_day_number: u8,
+    pub min_notice_days_for_visit: u8,
+    pub additional_tenants: Vec<String>,
+    pub allowed_animals: Vec<String>,
+    pub additional_property: HashMap<String, u64>
+}
+
 ////////////////////////////////////////////////////////////////
 // 8) Example usage: build & return final Typst calls string  //
 ////////////////////////////////////////////////////////////////
 
 /// Example function. In your real code, you'd pass in `_tenant_data`, etc.
 pub async fn generate(
-    _state: &ServerState,
-    _tenant_data: Arc<DocumentData>,
-    _landlord_data: Arc<DocumentData>,
-    _housing_data: HousingData,
+    state: &ServerState,
+    tenant_data: Arc<DocumentUnit>,
+    landlord_data: Arc<DocumentUnit>,
+    housing_data: HousingData,
+    mut rent_data: RentData,
 ) -> Result<String, ServerError> {
+
+    let tenant_passport = tenant_data.internal_passport.clone();
+    let landlord_passport = landlord_data.internal_passport.clone();
+
+
+    let now: DateTime<Utc> = Utc::now();
+    let now = now.with_timezone(&Kyiv);
+
+
+    // TODO: hardcoded data
+    let ownership_record_date = now.checked_sub_days(Days::new(1000)).ok_or(anyhow!("cannot create ownership record date"))?;
+    let ownership_record_number = "34983948";
+
+    let tenant_phone_number = "0961234567";
+    let tenant_email = "tenant@example.com";
+
+    let landlord_phone_number = "0961234567";
+    let landlord_email = "tenant@example.com";
+
+
     // 1) RentalAgreementTitle
     let fun_title = RentalAgreementTitle {
-        rental_agreement_number: 42,
+        rental_agreement_number: 1,
     };
 
     // 2) RentalAgreementPlaceAndDate
     let fun_place_and_date = RentalAgreementPlaceAndDate {
-        place: "Львів".to_string(),
-        date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
+        place: housing_data.address.city.clone(),
+        date: TypstDateTime(now),
     };
 
-    // 3) SidesOfAgreement
+    let tenant_initials = tenant_passport.last_name_ua + " " + &tenant_passport.first_name_ua + " " + &tenant_passport.middle_name_ua;
+    let landlord_initials = landlord_passport.last_name_ua + " " + &landlord_passport.first_name_ua + " " + &landlord_passport.middle_name_ua;
+
     let tenant_person = PersonData {
-        initials: "Демчук Назар Ігорович".to_string(),
-        address_of_residence: "Україна, м. Луцьк, вул. Дружби, 63".to_string(),
+        initials: tenant_initials.clone(),
+        address_of_residence: tenant_passport.residence_ua.clone(),
         passport_data: PassportData {
             series: "-".to_string(),
-            number: "4323424322".to_string(),
-            issuing_authority: "3344".to_string(),
+            number: tenant_passport.doc_number.clone(),
+            issuing_authority: tenant_passport.department.clone(),
         },
-        phone_number: Some("0961234567".to_string()),
-        email: Some("tenant@example.com".to_string()),
+        phone_number: Some(tenant_phone_number.to_string()), // TODO
+        email: Some(tenant_email.to_string()), // TODO
     };
 
     let landlord_person = PersonData {
-        initials: "Скіра Володимир Васильович".to_string(),
-        address_of_residence: "Україна, м. Львів, вул. Пимоненка 7к".to_string(),
+        initials: landlord_initials.clone(),
+        address_of_residence: landlord_passport.residence_ua.clone(),
         passport_data: PassportData {
             series: "-".to_string(),
-            number: "5489939439".to_string(),
-            issuing_authority: "8754".to_string(),
+            number: landlord_passport.doc_number.clone(),
+            issuing_authority: landlord_passport.department.clone(),
         },
-        phone_number: Some("0663265785".to_string()),
-        email: Some("landlord@example.com".to_string()),
+        phone_number: Some(landlord_phone_number.to_string()), // TODO
+        email: Some(landlord_email.to_string()), // TODO
     };
 
     let fun_sides = SidesOfAgreement {
@@ -809,38 +876,37 @@ pub async fn generate(
     // 4) SubjectOfAgreement
     let fun_subject = SubjectOfAgreement {
         real_estate_data: RealEstateData {
-            r#type: "квартира".to_string(),
-            address: "Україна, Львівська обл., м. Львів, Сихівський р-н, вул. Пимоненка 7к"
-                .to_string(),
-            area: 43.0,
+            r#type: housing_data.r#type,
+            address: housing_data.address.full_address(),
+            area: housing_data.area,
         },
         ownership_record: OwnershipRecord {
-            number: "34983948".to_string(),
-            date: TypstDateTime(Utc.with_ymd_and_hms(2023, 11, 8, 0, 0, 0).unwrap()),
+            number: ownership_record_number.to_string(),
+            date: TypstDateTime(ownership_record_date),
         },
     };
 
     // 5) RightsAndObligations
     let fun_rights_and_obligations = RightsAndObligations {
-        rental_payment_delay_limit: 10,
+        rental_payment_delay_limit: rent_data.rental_payment_delay_limit,
     };
 
     // 6) RentalPayment
     let fun_rental_payment = RentalPayment {
         rental_payment_data: RentalPaymentData {
-            amount: 600.0,
-            currency: "USD".to_string(),
-            destination: "4627055710465997".to_string(),
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
-            payment_day_number: 1,
+            amount: rent_data.price,
+            currency: rent_data.currency,
+            destination: rent_data.destination,
+            starting_date: TypstDateTime(Kyiv.from_utc_datetime(&rent_data.start)),
+            payment_day_number: rent_data.payment_day_number,
         },
     };
 
     // 7) AgreementConditions
     let fun_agreement_conditions = AgreementConditions {
         agreement_conditions_data: AgreementConditionsData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
-            ending_date: TypstDateTime(Utc.with_ymd_and_hms(2025, 11, 19, 0, 0, 0).unwrap()),
+            starting_date: TypstDateTime(Kyiv.from_utc_datetime(&rent_data.start)),
+            ending_date: TypstDateTime(Kyiv.from_utc_datetime(&rent_data.end)),
         },
     };
 
@@ -848,57 +914,52 @@ pub async fn generate(
     let fun_responsibility = Responsibility;
 
     // 9) OtherConditions
+    let mut all_tenants = vec![tenant_initials.clone()];
+    all_tenants.append(&mut rent_data.additional_tenants);
     let fun_other_conditions = OtherConditions {
         other_conditions_data: OtherConditionsData {
-            min_notice_days_for_visit: 3,
-            all_tenants: vec![
-                "Демчук Назар Ігорович".to_string(),
-                "Самойленко Марта Юріївна".to_string(),
-            ],
-            allowed_animals: vec![
-                "собака породи Чіхуахуа: 1 шт.".to_string(),
-                "кіт породи Персицької: 2 шт.".to_string(),
-            ],
+            min_notice_days_for_visit: rent_data.min_notice_days_for_visit,
+            all_tenants,
+            allowed_animals: rent_data.allowed_animals,
         },
     };
 
     // 10) Signatures
     let fun_signatures = Signatures {
         tenant: PersonData {
-            initials: "Демчук Назар Ігорович".to_string(),
-            address_of_residence: "Україна, м. Луцьк, вул. Дружби, 63".to_string(),
+            initials: tenant_initials.clone(),
+            address_of_residence: tenant_passport.residence_ua,
             passport_data: PassportData {
                 series: "-".to_string(),
-                number: "4323424322".to_string(),
-                issuing_authority: "3344".to_string(),
+                number: tenant_passport.doc_number,
+                issuing_authority: tenant_passport.department,
             },
-            phone_number: Some("0963211626".to_string()),
-            email: Some("nazar.demchvk@gmail.com".to_string()),
+            phone_number: Some(tenant_phone_number.to_string()),
+            email: Some(tenant_email.to_string()),
         },
         landlord: PersonData {
-            initials: "Скіра Володимир Васильович".to_string(),
-            address_of_residence: "Україна, м. Львів, вул. Пимоненка 7к".to_string(),
+            initials: landlord_initials.clone(),
+            address_of_residence: landlord_passport.residence_ua,
             passport_data: PassportData {
                 series: "-".to_string(),
-                number: "5489939439".to_string(),
-                issuing_authority: "8754".to_string(),
+                number: landlord_passport.doc_number,
+                issuing_authority: landlord_passport.department,
             },
-            phone_number: Some("0663265785".to_string()),
-            email: Some("vasylskira@gmail.com".to_string()),
+            phone_number: Some(landlord_phone_number.to_string()),
+            email: Some(landlord_email.to_string()),
         },
     };
 
     // 11) AppendixOne
-    let mut additional_property = HashMap::new();
-    additional_property.insert("Пральна машинка (Philips Wash 2015)".to_string(), 1);
-    additional_property.insert("Кондиціонер (AERO 2020)".to_string(), 2);
+    let additional_property = rent_data.additional_property;
 
+    // TODO: hardcoded data
     let fun_appendix_one = AppendixOne {
         appendix_one_data: AppendixOneData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
-            place: "Львів".to_string(),
-            tenant_initials: "Демчук Назар Ігорович".to_string(),
-            landlord_initials: "Скіра Володимир Васильович".to_string(),
+            starting_date: TypstDateTime(now),
+            place: housing_data.address.city.clone(),
+            tenant_initials: tenant_initials.clone(),
+            landlord_initials: landlord_initials.clone(),
             additional_property,
             meter_readings: MeterReadings {
                 electricity: MeterReadingData {
@@ -924,10 +985,10 @@ pub async fn generate(
     // 12) AppendixTwo
     let fun_appendix_two = AppendixTwo {
         appendix_two_data: AppendixTwoData {
-            starting_date: TypstDateTime(Utc.with_ymd_and_hms(2024, 11, 19, 12, 0, 0).unwrap()),
-            place: "Львів".to_string(),
-            tenant_initials: "Демчук Назар Ігорович".to_string(),
-            landlord_initials: "Скіра Володимир Васильович".to_string(),
+            starting_date: TypstDateTime(now),
+            place: housing_data.address.city,
+            tenant_initials: tenant_initials.clone(),
+            landlord_initials: landlord_initials.clone(),
         },
     };
 
@@ -950,11 +1011,7 @@ pub async fn generate(
     // Combine them into one big string
     let all_calls = calls.join("\n");
 
-    // Optionally, read your template and append `all_calls` at the end.
-    // let mut template = std::fs::read_to_string("resources/typst/rental_agreement_template.typ")?;
-    // template.push_str("\n//////////////////////////////////////////////////\n// BODY //\n//////////////////////////////////////////////////\n");
-    // template.push_str(&all_calls);
-    // Ok(template)
+    let typst_code = (*state.agreement_template_string).clone() + &all_calls;
 
-    Ok(all_calls)
+    Ok(typst_code)
 }
