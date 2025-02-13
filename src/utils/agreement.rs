@@ -756,14 +756,14 @@ impl FunctionCall for AppendixTwo {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct HousingData {
     address: HousingDataAddress,
     r#type: String,
     area: u64,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct HousingDataAddress {
     region: String,
     city: String,
@@ -783,7 +783,7 @@ impl HousingDataAddress {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct RentData {
     pub start: NaiveDateTime,
     pub end: NaiveDateTime,
