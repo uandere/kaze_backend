@@ -1,18 +1,20 @@
 use anyhow::Context;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::{
     commands::server::ServerState,
-    utils::{agreement::{generate, HousingData}, server_error::ServerError},
+    utils::{agreement::{generate, HousingData, RentData}, server_error::ServerError},
 };
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
-    // pub housing_data: HousingData,
+    pub housing_data: HousingData,
+    pub rent_data: RentData
 }
 
 #[derive(Serialize)]
@@ -24,23 +26,23 @@ pub struct Response {
 #[axum::debug_handler]
 pub async fn handler(
     State(state): State<ServerState>,
-    Json(Payload {
-        tenant_id,
-        landlord_id,
-        // housing_data,
-    }): Json<Payload>,
+    Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
+
+    info!("{}", serde_json::to_string_pretty(&payload)?);
+
+
     // getting tenant data from the cache
     let tenant_data = state
         .cache
-        .get(&tenant_id)
+        .get(&payload.tenant_id)
         .await
         .context("no data found for tenant with specified ID")?;
 
     // getting landlord data from the cache
     let landlord_data = state
         .cache
-        .get(&landlord_id)
+        .get(&payload.landlord_id)
         .await
         .context("no data found for landlord with specified ID")?;
 

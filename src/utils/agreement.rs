@@ -484,7 +484,7 @@ pub struct RealEstateData {
 }
 
 /// For meter reading, same approach with r#type => `type: "..."
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct MeterReadingData {
     #[serde(rename = "type")]
     pub r#type: String,
@@ -492,7 +492,7 @@ pub struct MeterReadingData {
     pub readings: Vec<f32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct MeterReadings {
     pub electricity: MeterReadingData,
     pub water: MeterReadingData,
@@ -795,7 +795,8 @@ pub struct RentData {
     pub min_notice_days_for_visit: u8,
     pub additional_tenants: Vec<String>,
     pub allowed_animals: Vec<String>,
-    pub additional_property: HashMap<String, u64>
+    pub additional_property: HashMap<String, u64>,
+    pub meter_readings: MeterReadings,
 }
 
 ////////////////////////////////////////////////////////////////
