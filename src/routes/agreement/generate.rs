@@ -9,7 +9,7 @@ use crate::{
 };
 
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
@@ -28,8 +28,6 @@ pub async fn handler(
     State(state): State<ServerState>,
     Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
-
-    info!("{}", serde_json::to_string_pretty(&payload)?);
 
 
     // getting tenant data from the cache
