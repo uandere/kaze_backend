@@ -1,9 +1,11 @@
 use axum_server::Handle;
+
 use std::{ffi::c_void, time::Duration};
 use tokio::signal;
 use tracing::info;
 
-use crate::{commands::server::ServerState, utils::eusign::{EUUnload, G_P_IFACE}};
+use crate::{commands::server::ServerState, utils::{cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT}, eusign::{EUUnload, G_P_IFACE}}};
+
 
 /// This function is used for graceful shutdown.
 /// Probably should be replaced with something more robust.
@@ -48,5 +50,9 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
     }
 
     // TODO: HERE WE NEED TO SAVE THE SERVER'S STATE
+
+    // Saving the cache into the file for now
+    save_cache_to_a_file(CACHE_SAVE_LOCATION_DEFAULT, state.cache).await;
+
     handle.graceful_shutdown(Some(Duration::from_secs(10)));
 }

@@ -3,10 +3,9 @@ use std::net::{SocketAddr, TcpListener};
 use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::routes::agreement::generate::Payload;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
-use crate::utils::cache::build_cache;
+use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
 use crate::utils::config::Config;
 use crate::utils::eusign::*;
 use crate::utils::server_error::EusignError;
@@ -51,6 +50,7 @@ pub fn run(
 
         let config = Config::new(&config_path);
         let cache = build_cache();
+        populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
 
 
         // cache keeper task to trigger cache updates once in a while
@@ -145,8 +145,6 @@ pub fn run(
         // graceful shutdown
         let shutdown_handle = Handle::new();
         tokio::spawn(graceful_shutdown(shutdown_handle.clone(), server_state));
-
-        info!("{}", serde_json::to_string_pretty(&Payload::default())?);
 
         info!("Starting the server...");
 

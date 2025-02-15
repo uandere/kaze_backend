@@ -1,7 +1,6 @@
 use anyhow::Context;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
-use tracing::info;
 
 use crate::{
     commands::server::ServerState,

@@ -1116,7 +1116,7 @@ pub struct DocumentData {
     pub internal_passport: Vec<InternalPassport>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DocumentUnit {
     #[serde(rename = "taxpayer-card")]
     pub taxpayer_card: TaxpayerCard,
@@ -1126,7 +1126,7 @@ pub struct DocumentUnit {
     pub internal_passport: InternalPassport,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TaxpayerCard {
     #[serde(rename = "creationDate")]
     pub creation_date: String,
@@ -1150,7 +1150,7 @@ pub struct TaxpayerCard {
     pub file_name: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InternalPassport {
     #[serde(rename = "taxpayerNumber")]
     pub taxpayer_number: String,

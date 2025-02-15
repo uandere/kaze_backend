@@ -284,15 +284,15 @@ struct Compound<'a> {
     _is_map: bool,
 }
 
-impl<'a> SerializeSeq for Compound<'a> {
+impl SerializeSeq for Compound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
     fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), TypstSerError> {
-        if !self.first {
-            self.ser.output.push_str(", ");
-        }
-        self.first = false;
+        // if !self.first {
+        self.ser.output.push_str(", ");
+        // }
+        // self.first = false;
         value.serialize(&mut *self.ser)?;
         Ok(())
     }
@@ -302,7 +302,7 @@ impl<'a> SerializeSeq for Compound<'a> {
     }
 }
 
-impl<'a> SerializeTuple for Compound<'a> {
+impl SerializeTuple for Compound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
@@ -314,7 +314,7 @@ impl<'a> SerializeTuple for Compound<'a> {
     }
 }
 
-impl<'a> SerializeTupleStruct for Compound<'a> {
+impl SerializeTupleStruct for Compound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
@@ -326,7 +326,7 @@ impl<'a> SerializeTupleStruct for Compound<'a> {
     }
 }
 
-impl<'a> SerializeMap for Compound<'a> {
+impl SerializeMap for Compound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
@@ -362,7 +362,7 @@ struct VariantCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
 }
-impl<'a> SerializeTupleVariant for VariantCompound<'a> {
+impl SerializeTupleVariant for VariantCompound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
@@ -384,7 +384,7 @@ struct StructCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
 }
-impl<'a> SerializeStruct for StructCompound<'a> {
+impl SerializeStruct for StructCompound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 
@@ -412,7 +412,7 @@ struct StructVariantCompound<'a> {
     ser: &'a mut TypstSerializer,
     first: bool,
 }
-impl<'a> SerializeStructVariant for StructVariantCompound<'a> {
+impl SerializeStructVariant for StructVariantCompound<'_> {
     type Ok = ();
     type Error = TypstSerError;
 

@@ -319,7 +319,8 @@
   + Орендар не має права проводити перевлаштування та реконструкцію Об’єкту нерухомості, змінювати стан майна без письмової згоди Орендодавця.
 
   + Фізичні особи, які будуть користуватися Об’єктом нерухомості для проживання:
-    #list(..other_conditions_data.all_tenants)
+      #list(..other_conditions_data.all_tenants)
+
   Зазначені особи набувають рівних з Орендарем прав і обов’язків щодо користування Об’єктом нерухомості.
 
   + Орендодавець не надає Орендарю право реєструвати (прописати) фізичних осіб за місцезнаходженням об’єкта нерухомості.
@@ -564,7 +565,7 @@
 
 #responsibility()
 
-#other_conditions(other_conditions_data: (min_notice_days_for_visit: 0, all_tenants: ("Дія Надія Володимирівна", "Дія Надія Володимирівна"), allowed_animals: ()))
+#other_conditions(other_conditions_data: (min_notice_days_for_visit: 0, all_tenants: ("Дія Надія Володимирівна",), allowed_animals: ("Чіхуахуахуахуа",)))
 
 #signatures(tenant: (initials: "Дія Надія Володимирівна", address_of_residence: "УКРАЇНА М. КИЇВ ВУЛ. ХМЕЛЬНИЦЬКОГО БОГДАНА БУД. 10 КВ. 43.
 Дата реєстрації: 29.06.2006", passport_data: (series: "-", number: "002307001", issuing_authority: "1263"), phone_number: "0961234567", email: "tenant@example.com"), landlord: (initials: "Дія Надія Володимирівна", address_of_residence: "УКРАЇНА М. КИЇВ ВУЛ. ХМЕЛЬНИЦЬКОГО БОГДАНА БУД. 10 КВ. 43.
