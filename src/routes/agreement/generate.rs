@@ -12,7 +12,9 @@ use crate::{
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
+    #[serde(default)]
     pub housing_data: HousingData,
+    #[serde(default)]
     pub rent_data: RentData
 }
 

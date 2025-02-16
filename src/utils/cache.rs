@@ -22,7 +22,7 @@ pub fn build_cache() -> Cache<String, Arc<DocumentUnit>> {
     Cache::builder().build()
 }
 
-/// A helper function used to resume the state of the server's challenge cache from the JSON file.
+/// A helper function used to resume the state of the server's cache from the JSON file.
 pub async fn populate_cache_from_file(
     cache_file_location: &str,
     cache: &Cache<String, Arc<DocumentUnit>>,
