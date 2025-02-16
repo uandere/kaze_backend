@@ -289,11 +289,8 @@ impl SerializeSeq for Compound<'_> {
     type Error = TypstSerError;
 
     fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), TypstSerError> {
-        // if !self.first {
-        self.ser.output.push_str(", ");
-        // }
-        // self.first = false;
         value.serialize(&mut *self.ser)?;
+        self.ser.output.push_str(", ");
         Ok(())
     }
     fn end(self) -> Result<(), TypstSerError> {

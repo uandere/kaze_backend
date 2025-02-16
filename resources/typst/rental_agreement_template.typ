@@ -473,8 +473,8 @@
       Показник лічильника холодної води: #appendix_one_data.meter_readings.water.readings.at(1) (м#super[3])
     ]
   }#linebreak()
-  Показник лічильника опалення: #appendix_one_data.meter_readings.heating.readings (Гкал) #linebreak()
-  Показник лічильника газу: #appendix_one_data.meter_readings.gas.readings (м#super[3])
+  Показник лічильника опалення: #appendix_one_data.meter_readings.heating.readings.at(0) (Гкал) #linebreak()
+  Показник лічильника газу: #appendix_one_data.meter_readings.gas.readings.at(0) (м#super[3])
 
   #align(center)[*Підписи сторін*]
 
