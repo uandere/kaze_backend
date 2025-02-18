@@ -5,7 +5,7 @@ pub mod server;
 pub use super::*;
 use clap::Parser;
 use server::ServerSubcommand;
-use tracing::error;
+use tracing::{error, info};
 
 
 #[derive(Parser)]
@@ -29,7 +29,7 @@ impl Subcommands {
 
                 match res {
                     Ok(_) => {
-                        error!("The server shut down unexpectedly");
+                        info!("The server was shut down.");
                     },
                     Err(e) => {
                         error!("The server returned the error: {e:?}");
