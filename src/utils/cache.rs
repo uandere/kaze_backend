@@ -65,7 +65,7 @@ pub async fn populate_cache_from_file(
             cache.insert(key, Arc::new(value)).await;
         }
 
-        println!("CACHE IMPORTED SUCCESSFULLY",);
+        info!("CACHE IMPORTED SUCCESSFULLY",);
         Ok(())
     } else {
         Err(ServerError(anyhow!(
@@ -81,7 +81,7 @@ pub async fn save_cache_to_a_file(
     // Ensure the directory exists
     if let Some(parent_dir) = std::path::Path::new(&cache_save_location).parent() {
         if let Err(e) = fs::create_dir_all(parent_dir).await {
-            eprintln!(
+            warn!(
                 "ERROR: UNABLE TO CREATE DIRECTORY {}: {}",
                 parent_dir.display(),
                 e
