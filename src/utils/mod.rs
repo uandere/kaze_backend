@@ -5,3 +5,4 @@ pub mod config;
 pub mod server_error;
 pub mod cache;
 pub mod agreement;
+pub mod typst;
