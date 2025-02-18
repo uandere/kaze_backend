@@ -147,7 +147,9 @@ pub fn run(
         let shutdown_handle = Handle::new();
         tokio::spawn(graceful_shutdown(shutdown_handle.clone(), server_state));
 
-        info!("{}", serde_json::to_string_pretty(&Payload::default())?);
+        let mut output = Payload::default();
+        output._landlord = Some(DocumentUnit { taxpayer_card: Default::default(), internal_passport: Default::default() });
+        info!("{}", serde_json::to_string_pretty(&output)?);
 
         info!("Starting the server...");
 
