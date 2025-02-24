@@ -26,8 +26,8 @@ pub struct Payload {
 /// Generates rental ageement between tenant and landlord.
 pub async fn handler(
     State(state): State<ServerState>,
-    Json(payload): Json<Payload>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+    Json(payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
     // checking authentication
     let token = bearer.token();
