@@ -163,6 +163,10 @@ pub fn run(
                 "/agreement/generate",
                 post(crate::routes::agreement::generate::handler),
             )
+            .route(
+                "/agreement/demo",
+                post(crate::routes::agreement::demo::handler),
+            )
             .layer(cors)
             .with_state(server_state.clone());
 

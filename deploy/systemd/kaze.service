@@ -9,6 +9,8 @@ User=ubuntu
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 Environment=RUST_BACKTRACE=1
 Environment=RUST_LOG=info
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/home/ubuntu/.config/gcloud/application_default_credentials.json"
+Environment="LD_LIBRARY_PATH=/home/ubuntu/kaze_backend/libs/eusign/shared:/usr/lib"
 ExecStart=/home/ubuntu/kaze_backend/target/release/kaze_backend server --https-port 8080
 Restart=on-failure
 RestartSec=5s
@@ -17,7 +19,6 @@ KillSignal=SIGINT
 StandardOutput=append:/home/ubuntu/kaze_backend/deploy/systemd/stdin.log
 StandardError=append:/home/ubuntu/kaze_backend/deploy/systemd/stderr.log
 WorkingDirectory=/home/ubuntu/kaze_backend
-Environment="LD_LIBRARY_PATH=/home/ubuntu/kaze_backend/libs/eusign/shared:/usr/lib"
 
 [Install]
 WantedBy=multi-user.target
