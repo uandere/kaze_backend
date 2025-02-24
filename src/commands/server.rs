@@ -3,7 +3,6 @@ use std::net::{SocketAddr, TcpListener};
 use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::routes::agreement::generate::Payload;
 // use aws_config::meta::region::RegionProviderChain;
 // use aws_sdk_secretsmanager::config::Region;
 use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
@@ -146,10 +145,6 @@ pub fn run(
         // graceful shutdown
         let shutdown_handle = Handle::new();
         tokio::spawn(graceful_shutdown(shutdown_handle.clone(), server_state));
-
-        let mut output = Payload::default();
-        output._landlord = Some(DocumentUnit { taxpayer_card: Default::default(), internal_passport: Default::default() });
-        info!("{}", serde_json::to_string_pretty(&output)?);
 
         info!("Starting the server...");
 
