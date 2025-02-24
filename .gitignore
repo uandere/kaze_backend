@@ -5,3 +5,4 @@ artifacts/
 config.toml
 CA-*.p7b
 !CACertificates.p7b
+.config/

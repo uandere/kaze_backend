@@ -1,12 +1,13 @@
 use anyhow::{anyhow, Context};
 use axum::{extract::State, response::Response, Json};
+use axum_extra::{headers::{authorization::Bearer, Authorization}, TypedHeader};
 use http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
 use typst_pdf::PdfOptions;
 
 use crate::{
     commands::server::ServerState,
-    utils::{agreement::{generate, HousingData, RentData}, server_error::ServerError, typst::TypstWrapperWorld},
+    utils::{agreement::{generate, HousingData, RentData}, server_error::ServerError, typst::TypstWrapperWorld, verify_jwt::verify_jwt},
 };
 
 
@@ -26,7 +27,15 @@ pub struct Payload {
 pub async fn handler(
     State(state): State<ServerState>,
     Json(payload): Json<Payload>,
+    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Response, ServerError> {
+    // checking authentication
+    let token = bearer.token();
+    let uid = verify_jwt(token, &state).await?;
+    if uid != payload.landlord_id {
+        return Err(anyhow!("you are not authorized to perform this action: you're not landlord").into());
+    }
+
     // getting tenant data from the cache
     let tenant_data = state
         .cache

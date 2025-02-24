@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::{c_char, c_ulong, c_void, CString};
 use std::net::{SocketAddr, TcpListener};
 use std::ptr;
@@ -16,6 +17,10 @@ use axum_server::Handle;
 use clap::Parser;
 use http::Method;
 use moka::future::Cache;
+use rs_firebase_admin_sdk::auth::token::cache::HttpCache;
+use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
+use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
+use rs_firebase_admin_sdk::*;
 use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
@@ -31,7 +36,7 @@ pub fn run(
         config_path,
         // region,
         challenge_cache_update_freq,
-        agreement_template_path
+        agreement_template_path,
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -51,7 +56,6 @@ pub fn run(
         let config = Config::new(&config_path);
         let cache = build_cache();
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
-
 
         // cache keeper task to trigger cache updates once in a while
         let cache_keeper_handle = || {
@@ -88,8 +92,8 @@ pub fn run(
             }
             G_P_IFACE = p_iface;
 
-            let cert_path = config.eusign.sz_path.clone()
-                + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
+            let cert_path =
+                config.eusign.sz_path.clone() + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
 
             cert = read_file_to_base64(&cert_path)?;
 
@@ -101,11 +105,30 @@ pub fn run(
             let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
             let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
 
-            ctx_read_private_key_file(lib_ctx, c_key_path.as_ptr() as *mut c_char, c_key_pwd.as_ptr() as *mut c_char, &mut key_ctx, ptr::null_mut());
-            
+            ctx_read_private_key_file(
+                lib_ctx,
+                c_key_path.as_ptr() as *mut c_char,
+                c_key_pwd.as_ptr() as *mut c_char,
+                &mut key_ctx,
+                ptr::null_mut(),
+            );
         }
 
         let agreement_template_string = Arc::new(read_to_string(agreement_template_path).await?);
+
+        // Live Firebase App
+        let gcp_service_account = credentials_provider()
+            .await
+            .expect("cannot receive google service account");
+        let live_app = App::live(gcp_service_account)
+            .await
+            .expect("cannot receive google live app");
+        let live_token_verifier = Arc::new(
+            live_app
+                .id_token_verifier()
+                .await
+                .expect("cannot receive google live token verifier"),
+        );
 
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
@@ -113,7 +136,8 @@ pub fn run(
             cert: Arc::new(cert),
             ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
             cache,
-            agreement_template_string
+            agreement_template_string,
+            live_token_verifier,
             // aws_sm_client
         };
 
@@ -130,11 +154,11 @@ pub fn run(
                 "/diia/signature",
                 get(crate::routes::diia::signature::handler),
             )
+            .route("/diia/sharing", post(crate::routes::diia::sharing::handler))
             .route(
-                "/diia/sharing",
-                post(crate::routes::diia::sharing::handler),
+                "/user/is_authorized",
+                get(crate::routes::user::is_authorized::handler),
             )
-            .route("/user/is_authorized", get(crate::routes::user::is_authorized::handler))
             .route(
                 "/agreement/generate",
                 post(crate::routes::agreement::generate::handler),
@@ -170,6 +194,9 @@ pub struct ServerState {
     pub cache: Cache<String, Arc<DocumentUnit>>,
     /// A string which contains a Typst template for the agreeement.
     pub agreement_template_string: Arc<String>,
+    /// Firebase Token verifirer
+    pub live_token_verifier:
+        Arc<LiveTokenVerifier<HttpCache<reqwest::Client, BTreeMap<String, JwtRsaPubKey>>>>,
     // aws_sm_client: aws_sdk_secretsmanager::Client
 }
 
@@ -184,14 +211,12 @@ pub struct ServerSubcommand {
     #[arg(long, default_value_t = String::from("./config.toml"))]
     pub config_path: String,
 
-
     #[arg(long, default_value = "1000", value_parser = parse_duration)]
     challenge_cache_update_freq: Duration,
 
     /// A path to the config file.
     #[arg(long, default_value_t = String::from("./resources/typst/rental_agreement_template.typ"))]
     pub agreement_template_path: String,
-
     // /// The region on which the AWS is running.
     // #[arg(long, default_value_t = String::from("eu-central-1"))]
     // region: String
