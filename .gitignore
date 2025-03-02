@@ -6,3 +6,5 @@ config.toml
 CA-*.p7b
 !CACertificates.p7b
 .config/
+libs/eusign/pkey
+libs/eusign/certificates
