@@ -34,8 +34,8 @@ rs-firebase-admin-sdk = "2.3.1"
 reqwest = "0.12.12"
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
 
-# aws-config = { version = "1.5.15", features = ["behavior-version-latest"] }
-# aws-sdk-secretsmanager = { version = "1.61.0" }
+aws-config = { version = "1.5.15", features = ["behavior-version-latest"] }
+aws-sdk-secretsmanager = { version = "1.61.0" }
 
 
 [build-dependencies]

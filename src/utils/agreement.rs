@@ -709,7 +709,7 @@ impl FunctionCall for Responsibility {
     }
     fn to_typst(&self) -> Result<String, TypstSerError> {
         // We want "#responsibility()"
-        Ok(format!("#responsibility()\n"))
+        Ok(format!("#{}\n", self.function_name()))
     }
 }
 

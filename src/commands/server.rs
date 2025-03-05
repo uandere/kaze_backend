@@ -11,6 +11,8 @@ use crate::utils::config::Config;
 use crate::utils::eusign::*;
 use crate::utils::server_error::EusignError;
 use crate::utils::shutdown::graceful_shutdown;
+use aws_config::meta::region::RegionProviderChain;
+use aws_config::Region;
 use axum::routing::{get, post};
 use axum::Router;
 use axum_server::Handle;
@@ -37,6 +39,7 @@ pub fn run(
         // region,
         challenge_cache_update_freq,
         agreement_template_path,
+        region,
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -46,12 +49,12 @@ pub fn run(
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
 
-        // let region_provider = RegionProviderChain::first_try(Region::new(region))
-        //     .or_default_provider()
-        //     .or_else(Region::new("eu-central-1"));
+        let region_provider = RegionProviderChain::first_try(Region::new(region))
+            .or_default_provider()
+            .or_else(Region::new("eu-central-1"));
 
-        // let aws_config = aws_config::from_env().region(region_provider).load().await;
-        // let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
+        let aws_config = aws_config::from_env().region(region_provider).load().await;
+        let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
 
         let config = Config::new(&config_path);
         let cache = build_cache();
@@ -138,7 +141,7 @@ pub fn run(
             cache,
             agreement_template_string,
             live_token_verifier,
-            // aws_sm_client
+            aws_sm_client
         };
 
         let cors = CorsLayer::new()
@@ -201,7 +204,8 @@ pub struct ServerState {
     /// Firebase Token verifirer
     pub live_token_verifier:
         Arc<LiveTokenVerifier<HttpCache<reqwest::Client, BTreeMap<String, JwtRsaPubKey>>>>,
-    // aws_sm_client: aws_sdk_secretsmanager::Client
+    /// AWS client
+    aws_sm_client: aws_sdk_secretsmanager::Client
 }
 
 #[derive(Parser, Clone)]
@@ -222,8 +226,8 @@ pub struct ServerSubcommand {
     #[arg(long, default_value_t = String::from("./resources/typst/rental_agreement_template.typ"))]
     pub agreement_template_path: String,
     // /// The region on which the AWS is running.
-    // #[arg(long, default_value_t = String::from("eu-central-1"))]
-    // region: String
+    #[arg(long, default_value_t = String::from("eu-central-1"))]
+    region: String
 }
 
 /// A helper function for parsing duration.
