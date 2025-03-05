@@ -1,5 +1,6 @@
 [Unit]
 After=network.target
+Wants=network-online.target
 Description=Kaze Backend
 StartLimitBurst=120
 StartLimitIntervalSec=10m
