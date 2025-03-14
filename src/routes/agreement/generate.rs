@@ -7,7 +7,7 @@ use typst_pdf::PdfOptions;
 
 use crate::{
     commands::server::ServerState,
-    utils::{agreement::{generate, HousingData, RentData}, server_error::ServerError, typst::TypstWrapperWorld, verify_jwt::verify_jwt},
+    utils::{agreement::{generate, HousingData, RentData}, db, server_error::ServerError, typst::TypstWrapperWorld, verify_jwt::verify_jwt},
 };
 
 
@@ -36,19 +36,29 @@ pub async fn handler(
         return Err(anyhow!("you are not authorized to perform this action: you're not landlord").into());
     }
 
-    // getting tenant data from the cache
-    let tenant_data = state
-        .cache
-        .get(&payload.tenant_id)
-        .await
-        .context("no data found for tenant with specified ID")?;
+    // First try to get data from the database
+    let tenant_data = match db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id).await {
+        Some(data) => data,
+        None => {
+            // If not in database, try the cache as fallback during transition period
+            state.cache
+                .get(&payload.tenant_id)
+                .await
+                .context("no data found for tenant with specified ID")?
+        }
+    };
 
-    // getting landlord data from the cache
-    let landlord_data = state
-        .cache
-        .get(&payload.landlord_id)
-        .await
-        .context("no data found for landlord with specified ID")?;
+    // Similarly for landlord data
+    let landlord_data = match db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id).await {
+        Some(data) => data,
+        None => {
+            // If not in database, try the cache as fallback
+            state.cache
+                .get(&payload.landlord_id)
+                .await
+                .context("no data found for landlord with specified ID")?
+        }
+    };
 
     let typst_code = generate(&state, tenant_data, landlord_data, payload.housing_data, payload.rent_data).await?;
 

@@ -4,12 +4,12 @@ use std::net::{SocketAddr, TcpListener};
 use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
-// use aws_config::meta::region::RegionProviderChain;
-// use aws_sdk_secretsmanager::config::Region;
 use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
 use crate::utils::config::Config;
+use crate::utils::db::{init_db_pool, setup_db, DbPool};
 use crate::utils::eusign::*;
 use crate::utils::server_error::EusignError;
+use crate::utils::secrets::get_secret;
 use crate::utils::shutdown::graceful_shutdown;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::Region;
@@ -27,19 +27,29 @@ use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
+use serde::Deserialize;
 
 use super::utils::server_error::ServerError;
 
+/// Database configuration from the AWS Secret
+#[derive(Deserialize)]
+struct DatabaseConfig {
+    username: String,
+    password: String,
+    host: String,
+    port: u16,
+    dbname: String,
+}
+
 /// A function that starts the server.
-/// For now, we can configure the port to run on.
 pub fn run(
     ServerSubcommand {
         https_port,
         config_path,
-        // region,
         challenge_cache_update_freq,
         agreement_template_path,
         region,
+        db_secret_name,
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -49,14 +59,32 @@ pub fn run(
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
 
-        let region_provider = RegionProviderChain::first_try(Region::new(region))
+        // Set up AWS
+        let region_provider = RegionProviderChain::first_try(Region::new(region.clone()))
             .or_default_provider()
             .or_else(Region::new("eu-central-1"));
 
         let aws_config = aws_config::from_env().region(region_provider).load().await;
         let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
 
+        // Retrieve DB password from Secrets Manager
+        let db_secret = get_secret(&aws_sm_client, &db_secret_name)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Failed to retrieve database secret"))?;
+        
+        // Parse the JSON secret
+        let db_config: DatabaseConfig = serde_json::from_str(&db_secret)
+            .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
+
+        // Initialize database connection
+        info!("Connecting to database...");
+        let db_pool = init_db_pool(&db_config.host, db_config.port, &db_config.username, &db_config.password, &db_config.dbname).await?;
+        setup_db(&db_pool).await?;
+        info!("Database connection established successfully.");
+
         let config = Config::new(&config_path);
+        
+        // We'll keep the cache for compatibility, but gradually transition to DB
         let cache = build_cache();
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
 
@@ -139,9 +167,10 @@ pub fn run(
             cert: Arc::new(cert),
             ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
             cache,
+            db_pool,
             agreement_template_string,
             live_token_verifier,
-            aws_sm_client
+            aws_sm_client,
         };
 
         let cors = CorsLayer::new()
@@ -149,8 +178,6 @@ pub fn run(
             .allow_methods([Method::GET, Method::POST])
             .allow_origin(Any);
 
-        // TODO: ask Diia team to change diia_sharing route to diia/sharing and
-        // diia_signature to diia/signature.
         let app = Router::new()
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route(
@@ -197,15 +224,17 @@ pub struct ServerState {
     pub cert: Arc<String>,
     /// A pointer to the context of the library
     pub ctx: Arc<EusignContext>,
-    /// A cache of (user_id, document_info) pairs
+    /// A cache of (user_id, document_info) pairs - will be phased out gradually
     pub cache: Cache<String, Arc<DocumentUnit>>,
+    /// The database connection pool
+    pub db_pool: DbPool,
     /// A string which contains a Typst template for the agreeement.
     pub agreement_template_string: Arc<String>,
     /// Firebase Token verifirer
     pub live_token_verifier:
         Arc<LiveTokenVerifier<HttpCache<reqwest::Client, BTreeMap<String, JwtRsaPubKey>>>>,
     /// AWS client
-    aws_sm_client: aws_sdk_secretsmanager::Client
+    pub aws_sm_client: aws_sdk_secretsmanager::Client,
 }
 
 #[derive(Parser, Clone)]
@@ -225,9 +254,14 @@ pub struct ServerSubcommand {
     /// A path to the config file.
     #[arg(long, default_value_t = String::from("./resources/typst/rental_agreement_template.typ"))]
     pub agreement_template_path: String,
-    // /// The region on which the AWS is running.
+    
+    /// The region on which the AWS is running.
     #[arg(long, default_value_t = String::from("eu-central-1"))]
-    region: String
+    region: String,
+    
+    /// The name of the secret containing database credentials
+    #[arg(long, default_value_t = String::from("rdsIdb-8dd73543-9c21-4891-9424-1571fc376941"))]
+    db_secret_name: String,
 }
 
 /// A helper function for parsing duration.

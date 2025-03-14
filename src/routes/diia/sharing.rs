@@ -2,7 +2,7 @@ use std::{str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
-    utils::{eusign::*, server_error::ServerError},
+    utils::{db, eusign::*, server_error::ServerError},
 };
 use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
@@ -22,7 +22,7 @@ pub struct Response {
 /// For now, the pipeline of handling the data is:
 /// 1. Decrypting the data using EUSignCP library.
 /// 2. Verifying that the data is signed by Diia public certificate.
-/// 3. Storing the data inside the cache.
+/// 3. Storing the data inside the database.
 pub async fn handler(
     State(state): State<ServerState>,
     mut multipart: Multipart,
@@ -55,14 +55,11 @@ pub async fn handler(
         let customer_data = from_utf8(&value)?;
 
         // 2) DECRYPT THE DATA
-        // Load the EUSignCP library
-        // Load all the necessary things
         let result = unsafe { decrypt_customer_data(&state, customer_data)? };
 
         info!("The result of the decryption: {}", result);
 
-        // 3) STORE THE DATA
-
+        // 3) PARSE AND STORE THE DATA
         // Deserializing using serde
         let result: DecryptionResult = serde_json::from_str(&result)?;
 
@@ -76,27 +73,29 @@ pub async fn handler(
         let data = result.data;
 
         let taxpayer_card = data
-        .taxpayer_card
-        .into_iter()
-        .next()
-        .ok_or(anyhow!("No passport found"))?;
+            .taxpayer_card
+            .into_iter()
+            .next()
+            .ok_or(anyhow!("No taxpayer card found"))?;
 
         let internal_passport = data
-        .internal_passport
-        .into_iter()
-        .next()
-        .ok_or(anyhow!("No passport found"))?;
-
+            .internal_passport
+            .into_iter()
+            .next()
+            .ok_or(anyhow!("No internal passport found"))?;
 
         let unit = DocumentUnit {
             taxpayer_card,
             internal_passport,
         };
 
-        // Sroring in the cache for now
+        // Store in database
+        db::store_document_unit(&state.db_pool, user_id, &unit).await?;
+        
+        // Also store in cache for compatibility during transition
         state.cache.insert(user_id.into(), Arc::new(unit)).await;
 
-        info!("Added user with id={user_id} to the cache!");
+        info!("Added user with id={user_id} to the database and cache!");
     }
 
     Ok(Json(Response { success: true }))
