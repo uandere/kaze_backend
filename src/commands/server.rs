@@ -260,7 +260,7 @@ pub struct ServerSubcommand {
     region: String,
     
     /// The name of the secret containing database credentials
-    #[arg(long, default_value_t = String::from("rdsIdb-8dd73543-9c21-4891-9424-1571fc376941"))]
+    #[arg(long, default_value_t = String::from("rds!db-8dd73543-9c21-4891-9424-1571fc376941"))]
     db_secret_name: String,
 }
 
