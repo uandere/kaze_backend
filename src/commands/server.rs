@@ -1,18 +1,11 @@
-use std::collections::BTreeMap;
-use std::ffi::{c_char, c_ulong, c_void, CString};
-use std::net::{SocketAddr, TcpListener};
-use std::ptr;
-use std::sync::Arc;
-use std::time::Duration;
 use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
 use crate::utils::config::Config;
 use crate::utils::db::{init_db_pool, setup_db, DbPool};
 use crate::utils::eusign::*;
-use crate::utils::server_error::EusignError;
 use crate::utils::secrets::get_secret;
+use crate::utils::server_error::EusignError;
 use crate::utils::shutdown::graceful_shutdown;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::Region;
+use aws_config::{BehaviorVersion, Region};
 use axum::routing::{get, post};
 use axum::Router;
 use axum_server::Handle;
@@ -23,11 +16,17 @@ use rs_firebase_admin_sdk::auth::token::cache::HttpCache;
 use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::ffi::{c_char, c_ulong, c_void, CString};
+use std::net::{SocketAddr, TcpListener};
+use std::ptr;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
-use serde::Deserialize;
 
 use super::utils::server_error::ServerError;
 
@@ -60,30 +59,40 @@ pub fn run(
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
 
         // Set up AWS
-        let region_provider = RegionProviderChain::first_try(Region::new(region.clone()))
-            .or_default_provider()
-            .or_else(Region::new("eu-central-1"));
+        // let region_provider = RegionProviderChain::first_try(Region::new(region.clone()))
+        //     .or_default_provider()
+        //     .or_else(Region::new("eu-central-1"));
 
-        let aws_config = aws_config::from_env().region(region_provider).load().await;
+        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+            .region(Region::new(region))
+            .load()
+            .await;
         let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
 
         // Retrieve DB password from Secrets Manager
         let db_secret = get_secret(&aws_sm_client, &db_secret_name)
             .await
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve database secret"))?;
-        
+
         // Parse the JSON secret
         let db_config: DatabaseConfig = serde_json::from_str(&db_secret)
             .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
 
         // Initialize database connection
         info!("Connecting to database...");
-        let db_pool = init_db_pool(&db_config.host, db_config.port, &db_config.username, &db_config.password, &db_config.dbname).await?;
+        let db_pool = init_db_pool(
+            &db_config.host,
+            db_config.port,
+            &db_config.username,
+            &db_config.password,
+            &db_config.dbname,
+        )
+        .await?;
         setup_db(&db_pool).await?;
         info!("Database connection established successfully.");
 
         let config = Config::new(&config_path);
-        
+
         // We'll keep the cache for compatibility, but gradually transition to DB
         let cache = build_cache();
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
@@ -254,11 +263,11 @@ pub struct ServerSubcommand {
     /// A path to the config file.
     #[arg(long, default_value_t = String::from("./resources/typst/rental_agreement_template.typ"))]
     pub agreement_template_path: String,
-    
+
     /// The region on which the AWS is running.
     #[arg(long, default_value_t = String::from("eu-central-1"))]
     region: String,
-    
+
     /// The name of the secret containing database credentials
     #[arg(long, default_value_t = String::from("rds!db-8dd73543-9c21-4891-9424-1571fc376941"))]
     db_secret_name: String,
