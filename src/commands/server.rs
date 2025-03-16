@@ -89,8 +89,6 @@ pub fn run(
             .await
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve database secret"))?;
 
-        info!("{}", db_secret);
-
         // Parse the JSON secret
         let db_config: DatabaseConfig = serde_json::from_str(&db_secret)
             .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
