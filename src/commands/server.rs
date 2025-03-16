@@ -16,7 +16,7 @@ use rs_firebase_admin_sdk::auth::token::cache::HttpCache;
 use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::ffi::{c_char, c_ulong, c_void, CString};
 use std::net::{SocketAddr, TcpListener};
@@ -31,13 +31,28 @@ use tracing::{error, info};
 use super::utils::server_error::ServerError;
 
 /// Database configuration from the AWS Secret
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct DatabaseConfig {
     username: String,
     password: String,
+    #[serde(default = "default_db_host")]
     host: String,
+    #[serde(default = "default_db_port")]
     port: u16,
+    #[serde(default = "default_db_name")]
     dbname: String,
+}
+
+fn default_db_host() -> String {
+    "kaze-rds-small.cfyeg0wimn2q.eu-central-1.rds.amazonaws.com".into()
+}
+
+fn default_db_port() -> u16 {
+    5432
+}
+
+fn default_db_name() -> String {
+    "diia".into()
 }
 
 /// A function that starts the server.
