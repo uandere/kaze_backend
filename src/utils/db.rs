@@ -130,14 +130,10 @@ pub async fn get_document_unit_from_db(pool: &DbPool, user_id: &str) -> Option<A
     .await
     .ok()?;
 
-    if let Some(record) = record {
-        Some(Arc::new(DocumentUnit {
+    record.map(|record| Arc::new(DocumentUnit {
             taxpayer_card: record.get("taxpayer_card"),
             internal_passport: record.get("internal_passport"),
         }))
-    } else {
-        None
-    }
 }
 
 /// Delete a document unit from the database
