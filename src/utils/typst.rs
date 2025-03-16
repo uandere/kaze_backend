@@ -3,6 +3,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use tracing::info;
 use typst::diag::{eco_format, FileError, FileResult, PackageError, PackageResult};
 use typst::foundations::{Bytes, Datetime};
 use typst::syntax::package::PackageSpec;
@@ -125,7 +126,7 @@ impl TypstWrapperWorld {
             return Ok(path);
         }
 
-        eprintln!("downloading {package}");
+        info!("downloading {package}");
         let url = format!(
             "https://packages.typst.org/{}/{}-{}.tar.gz",
             package.namespace, package.name, package.version,

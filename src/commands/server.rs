@@ -74,6 +74,8 @@ pub fn run(
             .await
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve database secret"))?;
 
+        info!("{}", db_secret);
+
         // Parse the JSON secret
         let db_config: DatabaseConfig = serde_json::from_str(&db_secret)
             .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
@@ -269,7 +271,7 @@ pub struct ServerSubcommand {
     region: String,
 
     /// The name of the secret containing database credentials
-    #[arg(long, default_value_t = String::from("arn:aws:secretsmanager:eu-central-1:711387130866:secret:rds!db-8dd73543-9c21-4891-9424-1571fc376941-rPAl72"))]
+    #[arg(long, default_value_t = String::from("rds!db-8dd73543-9c21-4891-9424-1571fc376941"))]
     db_secret_name: String,
 }
 
