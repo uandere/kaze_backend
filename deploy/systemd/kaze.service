@@ -17,7 +17,7 @@ Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=infinity
 KillSignal=SIGINT
-StandardOutput=append:/home/ssm-user/kaze_backend/deploy/systemd/stdin.log
+StandardOutput=append:/home/ssm-user/kaze_backend/deploy/systemd/stdout.log
 StandardError=append:/home/ssm-user/kaze_backend/deploy/systemd/stderr.log
 WorkingDirectory=/home/ssm-user/kaze_backend
 
