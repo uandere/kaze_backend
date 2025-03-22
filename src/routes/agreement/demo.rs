@@ -24,9 +24,9 @@ pub struct Payload {
     /// The rental data, like meter readings or monthly price.
     #[serde(default)]
     pub rent_data: RentData,
-    /// This field is only for demo purposes.
+    #[serde(default)]
     pub tenant: DocumentUnit,
-    /// This field is only for demo purposes.
+    #[serde(default)]
     pub landlord: DocumentUnit,
 }
 
