@@ -2,7 +2,6 @@ use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCA
 use crate::utils::config::Config;
 use crate::utils::db::{init_db_pool, setup_db, DbPool};
 use crate::utils::eusign::*;
-use crate::utils::s3::upload_object;
 use crate::utils::secrets::get_secret;
 use crate::utils::server_error::EusignError;
 use crate::utils::shutdown::graceful_shutdown;
@@ -223,10 +222,6 @@ pub fn run(
             )
             .layer(cors)
             .with_state(server_state.clone());
-
-        // TODO: remove
-        // test code to try to upload a file to AWS s3
-        upload_object(&server_state, tokio::fs::read("./Cargo.toml").await?, "test").await?;
 
         // graceful shutdown
         let shutdown_handle = Handle::new();

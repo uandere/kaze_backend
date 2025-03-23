@@ -1,7 +1,6 @@
 use super::{eusign::DocumentUnit, server_error::ServerError};
 use crate::commands::server::ServerState;
-use anyhow::anyhow;
-use chrono::{DateTime, Datelike, Days, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::{Europe::Kyiv, Tz};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -803,17 +802,32 @@ pub struct RentData {
     pub meter_readings: MeterReadings,
 }
 
+#[derive(Deserialize, Serialize, Default)]
+pub struct RequisitesData {
+    tenant_phone: String,
+    tenant_email: String,
+    landlord_phone: String,
+    landlord_email: String,
+}
+
+#[derive(Deserialize, Serialize, Default)]
+pub struct OwneshipData {
+    pub record_number: String,
+    pub date: NaiveDateTime,
+}
+
 ////////////////////////////////////////////////////////////////
 // 8) Example usage: build & return final Typst calls string  //
 ////////////////////////////////////////////////////////////////
 
-/// Example function. In your real code, you'd pass in `_tenant_data`, etc.
 pub async fn generate(
     state: &ServerState,
     tenant_data: Arc<DocumentUnit>,
     landlord_data: Arc<DocumentUnit>,
     housing_data: HousingData,
     mut rent_data: RentData,
+    requisites_data: RequisitesData,
+    ownership_data: OwneshipData,
 ) -> Result<String, ServerError> {
     let tenant_passport = tenant_data.internal_passport.clone();
     let landlord_passport = landlord_data.internal_passport.clone();
@@ -821,17 +835,14 @@ pub async fn generate(
     let now: DateTime<Utc> = Utc::now();
     let now = now.with_timezone(&Kyiv);
 
-    // TODO: hardcoded data
-    let ownership_record_date = now
-        .checked_sub_days(Days::new(1000))
-        .ok_or(anyhow!("cannot create ownership record date"))?;
-    let ownership_record_number = "34983948";
+    let ownership_record_date = Kyiv.from_utc_datetime(&ownership_data.date);
+    let ownership_record_number = ownership_data.record_number;
 
-    let tenant_phone_number = "0961234567";
-    let tenant_email = "tenant@example.com";
+    let tenant_phone_number = requisites_data.tenant_phone;
+    let tenant_email = requisites_data.tenant_email;
 
-    let landlord_phone_number = "0961234567";
-    let landlord_email = "tenant@example.com";
+    let landlord_phone_number = requisites_data.landlord_phone;
+    let landlord_email = requisites_data.landlord_email;
 
     // 1) RentalAgreementTitle
     let fun_title = RentalAgreementTitle {
@@ -863,8 +874,8 @@ pub async fn generate(
             number: tenant_passport.doc_number.clone(),
             issuing_authority: tenant_passport.department.clone(),
         },
-        phone_number: Some(tenant_phone_number.to_string()), // TODO
-        email: Some(tenant_email.to_string()),               // TODO
+        phone_number: Some(tenant_phone_number.to_string()),
+        email: Some(tenant_email.to_string()),
     };
 
     let landlord_person = PersonData {
@@ -875,8 +886,8 @@ pub async fn generate(
             number: landlord_passport.doc_number.clone(),
             issuing_authority: landlord_passport.department.clone(),
         },
-        phone_number: Some(landlord_phone_number.to_string()), // TODO
-        email: Some(landlord_email.to_string()),               // TODO
+        phone_number: Some(landlord_phone_number.to_string()),
+        email: Some(landlord_email.to_string()),
     };
 
     let fun_sides = SidesOfAgreement {
@@ -972,24 +983,7 @@ pub async fn generate(
             tenant_initials: tenant_initials.clone(),
             landlord_initials: landlord_initials.clone(),
             additional_property,
-            meter_readings: MeterReadings {
-                electricity: MeterReadingData {
-                    r#type: "TripleRate".to_string(),
-                    readings: vec![10.0, 20.0, 30.0],
-                },
-                water: MeterReadingData {
-                    r#type: "DualRate".to_string(),
-                    readings: vec![100.0, 200.0],
-                },
-                heating: MeterReadingData {
-                    r#type: "SingleRate".to_string(),
-                    readings: vec![10.0],
-                },
-                gas: MeterReadingData {
-                    r#type: "SingleRate".to_string(),
-                    readings: vec![10.0],
-                },
-            },
+            meter_readings: rent_data.meter_readings,
         },
     };
 

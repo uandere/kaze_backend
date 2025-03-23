@@ -21,7 +21,7 @@ pub struct Response {
 pub async fn handler(
     State(_state): State<ServerState>,
     // TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Json(payload): Json<Payload>,
+    Json(_payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
     // checking authentication
     // let token = bearer.token();

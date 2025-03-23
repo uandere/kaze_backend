@@ -11,7 +11,7 @@ use typst_pdf::PdfOptions;
 use crate::{
     commands::server::ServerState,
     utils::{
-        agreement::{generate, HousingData, RentData},
+        agreement::{generate, HousingData, OwneshipData, RentData, RequisitesData},
         db,
         server_error::ServerError,
         typst::TypstWrapperWorld,
@@ -29,6 +29,12 @@ pub struct Payload {
     /// The rental data, like meter readings or monthly price.
     #[serde(default)]
     pub rent_data: RentData,
+    /// The requisites data, like phone numbers and emails.
+    #[serde(default)]
+    pub requisites_data: RequisitesData,
+    /// The ownership data, like ownership record number and date.
+    #[serde(default)]
+    pub ownership_data: OwneshipData,
 }
 
 /// Generates rental ageement between tenant and landlord.
@@ -80,6 +86,8 @@ pub async fn handler(
         landlord_data,
         payload.housing_data,
         payload.rent_data,
+        payload.requisites_data,
+        payload.ownership_data,
     )
     .await?;
 

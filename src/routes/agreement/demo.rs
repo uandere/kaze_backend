@@ -9,7 +9,7 @@ use typst_pdf::PdfOptions;
 use crate::{
     commands::server::ServerState,
     utils::{
-        agreement::{generate, HousingData, RentData},
+        agreement::{generate, HousingData, OwneshipData, RentData, RequisitesData},
         eusign::DocumentUnit,
         server_error::ServerError,
         typst::TypstWrapperWorld,
@@ -28,6 +28,10 @@ pub struct Payload {
     pub tenant: DocumentUnit,
     #[serde(default)]
     pub landlord: DocumentUnit,
+    #[serde(default)]
+    pub requisites_data: RequisitesData,
+    #[serde(default)]
+    pub ownership_data: OwneshipData,
 }
 
 /// Generates rental ageement between tenant and landlord.
@@ -41,6 +45,8 @@ pub async fn handler(
         Arc::new(payload.landlord),
         payload.housing_data,
         payload.rent_data,
+        payload.requisites_data,
+        payload.ownership_data,
     )
     .await?;
 
