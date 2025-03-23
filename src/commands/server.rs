@@ -71,6 +71,7 @@ pub fn run(
     let runtime = Runtime::new()?;
 
     tracing_subscriber::fmt().with_ansi(false).init();
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
 
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
