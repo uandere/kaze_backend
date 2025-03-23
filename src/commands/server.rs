@@ -260,7 +260,7 @@ pub struct ServerState {
     /// AWS S3 client
     pub aws_s3_client: aws_sdk_s3::Client,
     /// AWS S3 bucket name
-    s3_bucket_name: String,
+    pub s3_bucket_name: String,
 }
 
 #[derive(Parser, Clone)]

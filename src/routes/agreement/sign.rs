@@ -1,14 +1,9 @@
-use anyhow::anyhow;
 use axum::{extract::State, Json};
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader,
-};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     commands::server::ServerState,
-    utils::{server_error::ServerError, verify_jwt::verify_jwt},
+    utils::server_error::ServerError
 };
 
 #[derive(Deserialize, Serialize, Default)]
@@ -18,14 +13,14 @@ pub struct Payload {
 }
 
 pub struct Response {
-    deeplink: String,
+    _deeplink: String,
 }
 
 /// Generates rental ageement between tenant and landlord.
 pub async fn handler(
-    State(state): State<ServerState>,
+    State(_state): State<ServerState>,
     // TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Json(payload): Json<Payload>,
+    Json(_payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
     // checking authentication
     // let token = bearer.token();
@@ -37,6 +32,6 @@ pub async fn handler(
     // First try to get data from the database
 
     Ok(Response {
-        deeplink: "".into(),
+        _deeplink: "".into(),
     })
 }
