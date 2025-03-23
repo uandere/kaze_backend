@@ -16,6 +16,7 @@ pub struct EUSignConfig {
     pub proxy_password: String,
     pub default_ocsp_server: String,
     pub default_tsp_server: String,
+    pub cert_file_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -25,8 +26,11 @@ pub struct Config {
 
 impl Config {
     pub fn new(path: &str) -> Self {
-        let config_file_content = fs::read_to_string(path).unwrap_or_else(|e| panic!("unable to read the config file at path: {path}, error: {e}"));
+        let config_file_content = fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!("unable to read the config file at path: {path}, error: {e}")
+        });
 
-        toml::from_str(&config_file_content).unwrap_or_else(|e| panic!("cannot parse config file: {e}"))
+        toml::from_str(&config_file_content)
+            .unwrap_or_else(|e| panic!("cannot parse config file: {e}"))
     }
 }

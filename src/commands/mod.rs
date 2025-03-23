@@ -7,7 +7,6 @@ use clap::Parser;
 use server::ServerSubcommand;
 use tracing::{error, info};
 
-
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
@@ -30,12 +29,12 @@ impl Subcommands {
                 match res {
                     Ok(_) => {
                         info!("The server was shut down.");
-                    },
+                    }
                     Err(e) => {
                         error!("The server returned the error: {e:?}");
-                    },
+                    }
                 }
-            },
+            }
         }
     }
 }

@@ -1094,8 +1094,6 @@ unsafe impl Send for EusignContext {}
 /// are guaranteed to not change.
 unsafe impl Sync for EusignContext {}
 
-
-
 #[derive(Debug, Deserialize)]
 pub struct DecryptionResult {
     #[serde(rename = "requestId")]
@@ -1120,7 +1118,6 @@ pub struct DocumentData {
 pub struct DocumentUnit {
     #[serde(rename = "taxpayer-card")]
     pub taxpayer_card: TaxpayerCard,
-
 
     #[serde(rename = "internal-passport")]
     pub internal_passport: InternalPassport,

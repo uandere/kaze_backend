@@ -4,8 +4,13 @@ use std::{ffi::c_void, time::Duration};
 use tokio::signal;
 use tracing::info;
 
-use crate::{commands::server::ServerState, utils::{cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT}, eusign::{EUUnload, G_P_IFACE}}};
-
+use crate::{
+    commands::server::ServerState,
+    utils::{
+        cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT},
+        eusign::{EUUnload, G_P_IFACE},
+    },
+};
 
 /// This function is used for graceful shutdown.
 /// Probably should be replaced with something more robust.
@@ -37,10 +42,14 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
 
     // Free the EUSign library
     unsafe {
-        let ctx_free_private_key = (*G_P_IFACE).CtxFreePrivateKey.expect("wasn't able to free the private key context");
+        let ctx_free_private_key = (*G_P_IFACE)
+            .CtxFreePrivateKey
+            .expect("wasn't able to free the private key context");
         ctx_free_private_key(state.ctx.key_ctx as *mut c_void);
 
-        let ctx_free = (*G_P_IFACE).CtxFree.expect("wasn't able to free the library context");
+        let ctx_free = (*G_P_IFACE)
+            .CtxFree
+            .expect("wasn't able to free the library context");
         ctx_free(state.ctx.lib_ctx as *mut c_void);
 
         let finalize_fn = (*G_P_IFACE).Finalize.unwrap();

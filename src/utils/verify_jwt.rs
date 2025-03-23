@@ -20,7 +20,6 @@ async fn verify_token<T: TokenVerifier>(token: &str, verifier: &T) -> Result<Str
     }
 }
 
-
 pub async fn verify_jwt(token: &str, state: &ServerState) -> Result<String, ServerError> {
     verify_token(token, state.live_token_verifier.as_ref()).await
 }

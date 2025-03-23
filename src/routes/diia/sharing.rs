@@ -17,7 +17,7 @@ pub struct Response {
     success: bool,
 }
 
-/// This route handles encrypted packages of data from that come from Diia servers.
+/// This route handles encrypted packages of data that come from Diia servers.
 ///
 /// For now, the pipeline of handling the data is:
 /// 1. Decrypting the data using EUSignCP library.
@@ -91,7 +91,7 @@ pub async fn handler(
 
         // Store in database
         db::store_document_unit(&state.db_pool, user_id, &unit).await?;
-        
+
         // Also store in cache for compatibility during transition
         state.cache.insert(user_id.into(), Arc::new(unit)).await;
 

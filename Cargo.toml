@@ -36,6 +36,7 @@ axum-extra = { version = "0.10.0", features = ["typed-header"] }
 sqlx = { version = "0.8.3", features = ["runtime-tokio-rustls", "postgres", "json", "time", "chrono"] }
 aws-config = { version = "1.5.15", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { version = "1.61.0" }
+aws-sdk-s3 = "1.79.0"
 
 
 [build-dependencies]

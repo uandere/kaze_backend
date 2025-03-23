@@ -64,6 +64,7 @@ pub fn run(
         agreement_template_path,
         region,
         db_secret_name,
+        s3_bucket_name,
     }: ServerSubcommand,
 ) -> Result<(), ServerError> {
     let runtime = Runtime::new()?;
@@ -73,16 +74,12 @@ pub fn run(
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
 
-        // Set up AWS
-        // let region_provider = RegionProviderChain::first_try(Region::new(region.clone()))
-        //     .or_default_provider()
-        //     .or_else(Region::new("eu-central-1"));
-
-        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
             .region(Region::new(region))
             .load()
             .await;
         let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
+        let aws_s3_client = aws_sdk_s3::Client::new(&aws_config);
 
         // Retrieve DB password from Secrets Manager
         let db_secret = get_secret(&aws_sm_client, &db_secret_name)
@@ -147,8 +144,7 @@ pub fn run(
             }
             G_P_IFACE = p_iface;
 
-            let cert_path =
-                config.eusign.sz_path.clone() + "EU-5E984D526F82F38F040000007383AE017103E805.cer";
+            let cert_path = config.eusign.sz_path.clone() + &config.eusign.cert_file_name;
 
             cert = read_file_to_base64(&cert_path)?;
 
@@ -195,6 +191,8 @@ pub fn run(
             agreement_template_string,
             live_token_verifier,
             aws_sm_client,
+            aws_s3_client,
+            s3_bucket_name,
         };
 
         let cors = CorsLayer::new()
@@ -257,8 +255,12 @@ pub struct ServerState {
     /// Firebase Token verifirer
     pub live_token_verifier:
         Arc<LiveTokenVerifier<HttpCache<reqwest::Client, BTreeMap<String, JwtRsaPubKey>>>>,
-    /// AWS client
+    /// AWS SM client
     pub aws_sm_client: aws_sdk_secretsmanager::Client,
+    /// AWS S3 client
+    pub aws_s3_client: aws_sdk_s3::Client,
+    /// AWS S3 bucket name
+    s3_bucket_name: String,
 }
 
 #[derive(Parser, Clone)]
@@ -286,6 +288,10 @@ pub struct ServerSubcommand {
     /// The name of the secret containing database credentials
     #[arg(long, default_value_t = String::from("rds!db-8dd73543-9c21-4891-9424-1571fc376941"))]
     db_secret_name: String,
+
+    /// The name of the s3 bucket
+    #[arg(long, default_value_t = String::from("kaze-agreements"))]
+    s3_bucket_name: String,
 }
 
 /// A helper function for parsing duration.

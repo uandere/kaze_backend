@@ -771,12 +771,19 @@ pub struct HousingDataAddress {
 
 impl HousingDataAddress {
     pub fn full_address(&self) -> String {
-        "Україна".to_string() + ", " +
-        &self.region + " обл., " + 
-        "м. " + &self.city + ", " + 
-        &self.district + " р-н, " + 
-        "вул. " + &self.street + " " + 
-        &self.apartment_number
+        "Україна".to_string()
+            + ", "
+            + &self.region
+            + " обл., "
+            + "м. "
+            + &self.city
+            + ", "
+            + &self.district
+            + " р-н, "
+            + "вул. "
+            + &self.street
+            + " "
+            + &self.apartment_number
     }
 }
 
@@ -808,17 +815,16 @@ pub async fn generate(
     housing_data: HousingData,
     mut rent_data: RentData,
 ) -> Result<String, ServerError> {
-
     let tenant_passport = tenant_data.internal_passport.clone();
     let landlord_passport = landlord_data.internal_passport.clone();
-
 
     let now: DateTime<Utc> = Utc::now();
     let now = now.with_timezone(&Kyiv);
 
-
     // TODO: hardcoded data
-    let ownership_record_date = now.checked_sub_days(Days::new(1000)).ok_or(anyhow!("cannot create ownership record date"))?;
+    let ownership_record_date = now
+        .checked_sub_days(Days::new(1000))
+        .ok_or(anyhow!("cannot create ownership record date"))?;
     let ownership_record_number = "34983948";
 
     let tenant_phone_number = "0961234567";
@@ -826,7 +832,6 @@ pub async fn generate(
 
     let landlord_phone_number = "0961234567";
     let landlord_email = "tenant@example.com";
-
 
     // 1) RentalAgreementTitle
     let fun_title = RentalAgreementTitle {
@@ -839,8 +844,16 @@ pub async fn generate(
         date: TypstDateTime(now),
     };
 
-    let tenant_initials = tenant_passport.last_name_ua + " " + &tenant_passport.first_name_ua + " " + &tenant_passport.middle_name_ua;
-    let landlord_initials = landlord_passport.last_name_ua + " " + &landlord_passport.first_name_ua + " " + &landlord_passport.middle_name_ua;
+    let tenant_initials = tenant_passport.last_name_ua
+        + " "
+        + &tenant_passport.first_name_ua
+        + " "
+        + &tenant_passport.middle_name_ua;
+    let landlord_initials = landlord_passport.last_name_ua
+        + " "
+        + &landlord_passport.first_name_ua
+        + " "
+        + &landlord_passport.middle_name_ua;
 
     let tenant_person = PersonData {
         initials: tenant_initials.clone(),
@@ -851,7 +864,7 @@ pub async fn generate(
             issuing_authority: tenant_passport.department.clone(),
         },
         phone_number: Some(tenant_phone_number.to_string()), // TODO
-        email: Some(tenant_email.to_string()), // TODO
+        email: Some(tenant_email.to_string()),               // TODO
     };
 
     let landlord_person = PersonData {
@@ -863,7 +876,7 @@ pub async fn generate(
             issuing_authority: landlord_passport.department.clone(),
         },
         phone_number: Some(landlord_phone_number.to_string()), // TODO
-        email: Some(landlord_email.to_string()), // TODO
+        email: Some(landlord_email.to_string()),               // TODO
     };
 
     let fun_sides = SidesOfAgreement {
