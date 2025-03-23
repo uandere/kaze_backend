@@ -10,17 +10,18 @@ use crate::{
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub _is_landlord: bool,
 }
 
 pub struct Response {
-    _deeplink: String,
+    pub deeplink: String,
 }
 
 /// Generates rental ageement between tenant and landlord.
 pub async fn handler(
     State(_state): State<ServerState>,
     // TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Json(_payload): Json<Payload>,
+    Json(payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
     // checking authentication
     // let token = bearer.token();
@@ -29,9 +30,9 @@ pub async fn handler(
     //     return Err(anyhow!("you are not authorized to perform this action: you're not landlord").into());
     // }
 
-    // First try to get data from the database
+
 
     Ok(Response {
-        _deeplink: "".into(),
+        deeplink: "".into(),
     })
 }

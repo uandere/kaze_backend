@@ -1,9 +1,9 @@
 // src/utils/db.rs
 use anyhow::{anyhow, Context};
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
 use serde_json;
-use sqlx::postgres::PgConnectOptions;
-use sqlx::Row;
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
+use sqlx::{postgres::{PgPoolOptions, PgConnectOptions}, Pool, Postgres, Decode, Row};
 use std::sync::Arc;
 
 use crate::utils::eusign::{DocumentUnit, InternalPassport, TaxpayerCard};
@@ -13,23 +13,14 @@ pub type DbPool = Pool<Postgres>;
 
 impl<'r> sqlx::Decode<'r, Postgres> for TaxpayerCard {
     fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        // Assuming TaxpayerCard is stored as JSON
         let json = <sqlx::types::Json<TaxpayerCard> as sqlx::Decode<Postgres>>::decode(value)?;
         Ok(json.0)
-
-        // Or if stored as binary:
-        // let bytes = <Vec<u8> as Decode<Postgres>>::decode(value)?;
-        // serde_json::from_slice(&bytes).map_err(Into::into)
     }
 }
 
 impl sqlx::Type<Postgres> for TaxpayerCard {
     fn type_info() -> sqlx::postgres::PgTypeInfo {
-        // Use JSONB type if stored as JSON
         sqlx::postgres::PgTypeInfo::with_name("jsonb")
-
-        // Or if stored as binary:
-        // sqlx::postgres::PgTypeInfo::with_name("bytea")
     }
 }
 
@@ -83,6 +74,20 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
     .execute(pool)
     .await
     .context("Failed to create document_units table")?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS agreements (
+            tenant_id TEXT NOT NULL,
+            landlord_id TEXT NOT NULL,
+            date DATE NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (tenant_id, landlord_id, date)
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("Failed to create agreements table")?;
 
     Ok(())
 }
@@ -146,6 +151,158 @@ pub async fn delete_document_unit(pool: &DbPool, user_id: &str) -> Result<bool, 
         .execute(pool)
         .await
         .context("Failed to delete document unit")?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+#[derive(Serialize, Deserialize, Decode)]
+pub struct AgreementProposal {
+    pub tenant_id: String,
+    pub landlord_id: String,
+    pub date: NaiveDate,
+}
+
+/// Create a new agreement proposal in the database
+pub async fn create_agreement(
+    pool: &DbPool,
+    proposal: &AgreementProposal,
+) -> Result<(), ServerError> {
+    sqlx::query(
+        r#"
+        INSERT INTO agreements (
+            tenant_id, 
+            landlord_id, 
+            date
+        )
+        VALUES ($1, $2, $3)
+        "#,
+    )
+    .bind(&proposal.tenant_id)
+    .bind(&proposal.landlord_id)
+    .bind(proposal.date)
+    .execute(pool)
+    .await
+    .context("Failed to insert agreement proposal")?;
+
+    Ok(())
+}
+
+/// Retrieve a specific agreement proposal from the database
+pub async fn get_agreement(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+    date: &NaiveDate,
+) -> Result<Option<AgreementProposal>, ServerError> {
+    let record = sqlx::query(
+        r#"
+        SELECT 
+            tenant_id, 
+            landlord_id, 
+            date
+        FROM agreements 
+        WHERE tenant_id = $1 AND landlord_id = $2 AND date = $3
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .bind(date)
+    .fetch_optional(pool)
+    .await
+    .context("Failed to fetch agreement proposal")?;
+
+    Ok(record.map(|row| AgreementProposal {
+        tenant_id: row.get("tenant_id"),
+        landlord_id: row.get("landlord_id"),
+        date: row.get("date"),
+    }))
+}
+
+/// Retrieve all agreement proposals for a specific tenant
+pub async fn get_agreements_for_tenant(
+    pool: &DbPool,
+    tenant_id: &str,
+) -> Result<Vec<AgreementProposal>, ServerError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            tenant_id, 
+            landlord_id, 
+            date
+        FROM agreements 
+        WHERE tenant_id = $1
+        ORDER BY date DESC
+        "#,
+    )
+    .bind(tenant_id)
+    .fetch_all(pool)
+    .await
+    .context("Failed to fetch tenant agreement proposals")?;
+
+    let proposals = rows
+        .into_iter()
+        .map(|row| AgreementProposal {
+            tenant_id: row.get("tenant_id"),
+            landlord_id: row.get("landlord_id"),
+            date: row.get("date"),
+        })
+        .collect();
+
+    Ok(proposals)
+}
+
+/// Retrieve all agreement proposals for a specific landlord
+pub async fn get_agreements_for_landlord(
+    pool: &DbPool,
+    landlord_id: &str,
+) -> Result<Vec<AgreementProposal>, ServerError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            tenant_id, 
+            landlord_id, 
+            date
+        FROM agreements 
+        WHERE landlord_id = $1
+        ORDER BY date DESC
+        "#,
+    )
+    .bind(landlord_id)
+    .fetch_all(pool)
+    .await
+    .context("Failed to fetch landlord agreement proposals")?;
+
+    let proposals = rows
+        .into_iter()
+        .map(|row| AgreementProposal {
+            tenant_id: row.get("tenant_id"),
+            landlord_id: row.get("landlord_id"),
+            date: row.get("date"),
+        })
+        .collect();
+
+    Ok(proposals)
+}
+
+/// Delete an agreement proposal from the database
+pub async fn delete_agreement(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+    date: &NaiveDate,
+) -> Result<bool, ServerError> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM agreements 
+        WHERE tenant_id = $1 AND landlord_id = $2 AND date = $3
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .bind(date)
+    .execute(pool)
+    .await
+    .context("Failed to delete agreement proposal")?;
 
     Ok(result.rows_affected() > 0)
 }
