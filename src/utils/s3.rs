@@ -1,14 +1,12 @@
 
 
-use axum::extract::State;
-
 use crate::commands::server::ServerState;
 
 use super::server_error::ServerError;
 
 // Function to upload data to S3
 pub async fn upload_object(
-    state: &State<ServerState>,
+    state: &ServerState,
     body: Vec<u8>,
     key: &str,
 ) -> Result<aws_sdk_s3::operation::put_object::PutObjectOutput, ServerError> {
