@@ -1,3 +1,2 @@
-pub mod signature;
-
 pub mod sharing;
+pub mod signature;

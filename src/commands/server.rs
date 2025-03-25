@@ -11,7 +11,6 @@ use axum::Router;
 use axum_server::Handle;
 use clap::Parser;
 use http::Method;
-use moka::future::Cache;
 use rs_firebase_admin_sdk::auth::token::cache::HttpCache;
 use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
@@ -28,6 +27,7 @@ use tokio::runtime::Runtime;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
+use super::utils::cache::AgreementProposalCache;
 use super::utils::server_error::ServerError;
 
 /// Database configuration from the AWS Secret
@@ -70,7 +70,9 @@ pub fn run(
     let runtime = Runtime::new()?;
 
     tracing_subscriber::fmt().with_ansi(false).init();
-    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
 
     runtime.block_on(async {
         let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], https_port)))?;
@@ -107,7 +109,7 @@ pub fn run(
         let config = Config::new(&config_path);
 
         // We'll keep the cache for compatibility, but gradually transition to DB
-        let cache = build_cache();
+        let cache = build_cache(Arc::new(db_pool.clone()));
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
 
         // cache keeper task to trigger cache updates once in a while
@@ -247,8 +249,8 @@ pub struct ServerState {
     pub cert: Arc<String>,
     /// A pointer to the context of the library
     pub ctx: Arc<EusignContext>,
-    /// A cache of (user_id, document_info) pairs - will be phased out gradually
-    pub cache: Cache<String, Arc<DocumentUnit>>,
+    /// A cache of agreement proposals
+    pub cache: AgreementProposalCache,
     /// The database connection pool
     pub db_pool: DbPool,
     /// A string which contains a Typst template for the agreeement.

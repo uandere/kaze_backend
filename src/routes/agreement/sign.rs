@@ -1,10 +1,7 @@
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    commands::server::ServerState,
-    utils::server_error::ServerError
-};
+use crate::{commands::server::ServerState, utils::server_error::ServerError};
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct Payload {
@@ -29,8 +26,6 @@ pub async fn handler(
     // if uid != payload.landlord_id {
     //     return Err(anyhow!("you are not authorized to perform this action: you're not landlord").into());
     // }
-
-
 
     Ok(Response {
         deeplink: "".into(),

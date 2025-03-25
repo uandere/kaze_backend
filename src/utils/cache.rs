@@ -1,7 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
-use moka::future::Cache;
+use chrono::Utc;
+use moka::{
+    future::{Cache, FutureExt},
+    notification::ListenerFuture,
+    Expiry,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs,
@@ -9,23 +14,94 @@ use tokio::{
 };
 use tracing::*;
 
-use super::{eusign::DocumentUnit, server_error::ServerError};
+use super::{db, server_error::ServerError};
 
 pub const CACHE_SAVE_LOCATION_DEFAULT: &str = "checkpoint/cache.json";
 
+pub type AgreementProposalCache = Cache<AgreementProposalKey, Arc<AgreementProposalValue>>;
+pub type AgreementProposalMap = HashMap<AgreementProposalKey, AgreementProposalValue>;
+
 #[derive(Deserialize, Serialize)]
 pub struct SavedChallengeCache {
-    pub cache: HashMap<String, DocumentUnit>,
+    pub cache: AgreementProposalMap,
 }
 
-pub fn build_cache() -> Cache<String, Arc<DocumentUnit>> {
-    Cache::builder().build()
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Debug)]
+pub struct AgreementProposalKey {
+    pub tenant_id: String,
+    pub landlord_id: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AgreementProposalValue {
+    pub tenant_confirmed: bool,
+    pub landlord_confirmed: bool,
+    pub tenant_signed: bool,
+    pub landlord_signed: bool,
+}
+
+pub struct AgreedAndSignedExpiry;
+
+impl Expiry<AgreementProposalKey, Arc<AgreementProposalValue>> for AgreedAndSignedExpiry {
+    fn expire_after_update(
+        &self,
+        _: &AgreementProposalKey,
+        value: &Arc<AgreementProposalValue>,
+        _: std::time::Instant,
+        _: Option<std::time::Duration>,
+    ) -> Option<std::time::Duration> {
+        if value.landlord_confirmed
+            && value.landlord_signed
+            && value.tenant_confirmed
+            && value.tenant_signed
+        {
+            Some(Duration::from_secs(0))
+        } else {
+            None
+        }
+    }
+}
+
+pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
+    let expiry = AgreedAndSignedExpiry;
+
+    // In this function we move the entry to the permanent database.
+    let eviction_listener = move |key: Arc<AgreementProposalKey>,
+                                  _val: Arc<AgreementProposalValue>,
+                                  _c|
+          -> ListenerFuture {
+        let pool = pool.clone();
+
+        async move {
+            let res = db::create_agreement(
+                &pool,
+                &db::Agreement {
+                    tenant_id: key.tenant_id.clone(),
+                    landlord_id: key.landlord_id.clone(),
+                    date: Utc::now().date_naive(),
+                },
+            )
+            .await;
+
+            match res {
+                Ok(_) => info!("agreement proposal with key = {:?} is removed from cache: both parties agreed and signed", key),
+                // TODO: here we might want to consider recreating the entry with the last unmodified parameter, aka (true, true, false, true)
+                // and prompt the corresponding user to retry
+                Err(e) => error!("agreement proposal with key = {:?} is removed from cache, but was not added to database: {:?}", key, e),
+            }
+        }
+        .boxed()
+    };
+
+    Cache::builder()
+        .expire_after(expiry)
+        .async_eviction_listener(eviction_listener)
+        .build()
+}
 /// A helper function used to resume the state of the server's cache from the JSON file.
 pub async fn populate_cache_from_file(
     cache_file_location: &str,
-    cache: &Cache<String, Arc<DocumentUnit>>,
+    cache: &AgreementProposalCache,
 ) -> Result<(), ServerError> {
     // Attempt to open the file
     let file_to_load_cache = if let Ok(file) = fs::File::open(cache_file_location).await {
@@ -74,10 +150,7 @@ pub async fn populate_cache_from_file(
     }
 }
 
-pub async fn save_cache_to_a_file(
-    cache_save_location: &str,
-    cache: Cache<String, Arc<DocumentUnit>>,
-) {
+pub async fn save_cache_to_a_file(cache_save_location: &str, cache: AgreementProposalCache) {
     // Ensure the directory exists
     if let Some(parent_dir) = std::path::Path::new(&cache_save_location).parent() {
         if let Err(e) = fs::create_dir_all(parent_dir).await {

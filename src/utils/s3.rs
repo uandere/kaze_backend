@@ -1,5 +1,3 @@
-
-
 use crate::commands::server::ServerState;
 
 use super::server_error::ServerError;
@@ -11,7 +9,8 @@ pub async fn upload_object(
     key: &str,
 ) -> Result<aws_sdk_s3::operation::put_object::PutObjectOutput, ServerError> {
     let body = aws_sdk_s3::primitives::ByteStream::from(body);
-    state.aws_s3_client
+    state
+        .aws_s3_client
         .put_object()
         .bucket(&state.s3_bucket_name)
         .key(key)

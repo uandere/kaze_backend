@@ -1,4 +1,4 @@
-use std::{str::from_utf8, sync::Arc};
+use std::str::from_utf8;
 
 use crate::{
     commands::server::ServerState,
@@ -92,10 +92,7 @@ pub async fn handler(
         // Store in database
         db::store_document_unit(&state.db_pool, user_id, &unit).await?;
 
-        // Also store in cache for compatibility during transition
-        state.cache.insert(user_id.into(), Arc::new(unit)).await;
-
-        info!("Added user with id={user_id} to the database and cache!");
+        info!("Added user with id={user_id} to the database!");
     }
 
     Ok(Json(Response { success: true }))

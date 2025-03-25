@@ -3,7 +3,10 @@ use anyhow::{anyhow, Context};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sqlx::{postgres::{PgPoolOptions, PgConnectOptions}, Pool, Postgres, Decode, Row};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    Decode, Pool, Postgres, Row,
+};
 use std::sync::Arc;
 
 use crate::utils::eusign::{DocumentUnit, InternalPassport, TaxpayerCard};
@@ -156,17 +159,14 @@ pub async fn delete_document_unit(pool: &DbPool, user_id: &str) -> Result<bool, 
 }
 
 #[derive(Serialize, Deserialize, Decode)]
-pub struct AgreementProposal {
+pub struct Agreement {
     pub tenant_id: String,
     pub landlord_id: String,
     pub date: NaiveDate,
 }
 
-/// Create a new agreement proposal in the database
-pub async fn create_agreement(
-    pool: &DbPool,
-    proposal: &AgreementProposal,
-) -> Result<(), ServerError> {
+/// Create a new agreement in the database
+pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<(), ServerError> {
     sqlx::query(
         r#"
         INSERT INTO agreements (
@@ -177,23 +177,23 @@ pub async fn create_agreement(
         VALUES ($1, $2, $3)
         "#,
     )
-    .bind(&proposal.tenant_id)
-    .bind(&proposal.landlord_id)
-    .bind(proposal.date)
+    .bind(&agreement.tenant_id)
+    .bind(&agreement.landlord_id)
+    .bind(agreement.date)
     .execute(pool)
     .await
-    .context("Failed to insert agreement proposal")?;
+    .context("Failed to insert agreement")?;
 
     Ok(())
 }
 
-/// Retrieve a specific agreement proposal from the database
+/// Retrieve a specific agreement from the database
 pub async fn get_agreement(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
     date: &NaiveDate,
-) -> Result<Option<AgreementProposal>, ServerError> {
+) -> Result<Option<Agreement>, ServerError> {
     let record = sqlx::query(
         r#"
         SELECT 
@@ -209,20 +209,20 @@ pub async fn get_agreement(
     .bind(date)
     .fetch_optional(pool)
     .await
-    .context("Failed to fetch agreement proposal")?;
+    .context("Failed to fetch the agreement")?;
 
-    Ok(record.map(|row| AgreementProposal {
+    Ok(record.map(|row| Agreement {
         tenant_id: row.get("tenant_id"),
         landlord_id: row.get("landlord_id"),
         date: row.get("date"),
     }))
 }
 
-/// Retrieve all agreement proposals for a specific tenant
+/// Retrieve all agreements for a specific tenant
 pub async fn get_agreements_for_tenant(
     pool: &DbPool,
     tenant_id: &str,
-) -> Result<Vec<AgreementProposal>, ServerError> {
+) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
         SELECT 
@@ -237,25 +237,25 @@ pub async fn get_agreements_for_tenant(
     .bind(tenant_id)
     .fetch_all(pool)
     .await
-    .context("Failed to fetch tenant agreement proposals")?;
+    .context("Failed to fetch tenant agreements")?;
 
-    let proposals = rows
+    let agreements = rows
         .into_iter()
-        .map(|row| AgreementProposal {
+        .map(|row| Agreement {
             tenant_id: row.get("tenant_id"),
             landlord_id: row.get("landlord_id"),
             date: row.get("date"),
         })
         .collect();
 
-    Ok(proposals)
+    Ok(agreements)
 }
 
-/// Retrieve all agreement proposals for a specific landlord
+/// Retrieve all agreements for a specific landlord
 pub async fn get_agreements_for_landlord(
     pool: &DbPool,
     landlord_id: &str,
-) -> Result<Vec<AgreementProposal>, ServerError> {
+) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
         SELECT 
@@ -270,21 +270,21 @@ pub async fn get_agreements_for_landlord(
     .bind(landlord_id)
     .fetch_all(pool)
     .await
-    .context("Failed to fetch landlord agreement proposals")?;
+    .context("Failed to fetch landlord agreements")?;
 
-    let proposals = rows
+    let agreements = rows
         .into_iter()
-        .map(|row| AgreementProposal {
+        .map(|row| Agreement {
             tenant_id: row.get("tenant_id"),
             landlord_id: row.get("landlord_id"),
             date: row.get("date"),
         })
         .collect();
 
-    Ok(proposals)
+    Ok(agreements)
 }
 
-/// Delete an agreement proposal from the database
+/// Delete an agreement from the database
 pub async fn delete_agreement(
     pool: &DbPool,
     tenant_id: &str,
@@ -302,7 +302,7 @@ pub async fn delete_agreement(
     .bind(date)
     .execute(pool)
     .await
-    .context("Failed to delete agreement proposal")?;
+    .context("Failed to delete agreement")?;
 
     Ok(result.rows_affected() > 0)
 }

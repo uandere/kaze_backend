@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use axum::{extract::State, response::Response, Json};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
@@ -53,32 +53,14 @@ pub async fn handler(
     }
 
     // First try to get data from the database
-    let tenant_data = match db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id).await
-    {
-        Some(data) => data,
-        None => {
-            // If not in database, try the cache as fallback during transition period
-            state
-                .cache
-                .get(&payload.tenant_id)
-                .await
-                .context("no data found for tenant with specified ID")?
-        }
-    };
+    let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
+        .await
+        .ok_or(anyhow!("cannot get tenant data from db"))?;
 
     // Similarly for landlord data
-    let landlord_data =
-        match db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id).await {
-            Some(data) => data,
-            None => {
-                // If not in database, try the cache as fallback
-                state
-                    .cache
-                    .get(&payload.landlord_id)
-                    .await
-                    .context("no data found for landlord with specified ID")?
-            }
-        };
+    let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
+        .await
+        .ok_or(anyhow!("cannot get tenant data from db"))?;
 
     let typst_code = generate(
         &state,
