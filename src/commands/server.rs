@@ -247,6 +247,14 @@ pub fn run(
                 "/agreement/demo",
                 post(crate::routes::agreement::demo::handler),
             )
+            .route(
+                "/agreement/sign",
+                post(crate::routes::agreement::sign::handler),
+            )
+            .route(
+                "/agreement/get",
+                post(crate::routes::agreement::get::get_latest_agreement),
+            )
             .layer(cors)
             .with_state(server_state.clone());
 

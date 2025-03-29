@@ -10,6 +10,7 @@ use crate::{
 use axum::extract::{Json, Multipart, State};
 use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
@@ -38,6 +39,7 @@ pub async fn handler(
     State(state): State<ServerState>,
     mut _multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
+    info!("signing hanler");
     // TODO
     // 1. Decrypting the hash using EUSignCP library.
 

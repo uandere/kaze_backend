@@ -63,17 +63,19 @@ pub struct Payload {
     pub landlord_id: String,
 }
 
+#[derive(Serialize)]
 pub struct Response {
     pub deeplink: String,
 }
 
 /// Generates a deeplink for Diia Signature.
 /// The deeplink activation through Diia app will trigger the signing process.
+#[axum::debug_handler]
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,
-) -> Result<Response, ServerError> {
+) -> Result<Json<Response>, ServerError> {
     // checking authentication
     let token = bearer.token();
     let uid = verify_jwt(token, &state).await?;
@@ -158,20 +160,21 @@ pub async fn handler(
 
     // sending the request
     let client = reqwest::Client::new();
-    let response = client
-        .post(endpoint)
-        .json(&request)
-        .send()
-        .await?;
+    let response = client.post(endpoint).json(&request).send().await?;
 
     // getting a deeplink and returning it
     if response.status().is_success() {
         let api_response: ApiResponse = response.json().await?;
 
-        Ok(Response {
+        Ok(Json(Response {
             deeplink: api_response.deeplink,
-        })
+        }))
     } else {
-        Err(anyhow!("Diia host returned with status {}: {}", response.status(), response.text().await?).into())
+        Err(anyhow!(
+            "Diia host returned with status {}: {}",
+            response.status(),
+            response.text().await?
+        )
+        .into())
     }
 }
