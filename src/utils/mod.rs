@@ -9,3 +9,4 @@ pub mod server_error;
 pub mod shutdown;
 pub mod typst;
 pub mod verify_jwt;
+pub mod diia;

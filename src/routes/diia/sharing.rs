@@ -6,18 +6,15 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tracing::info;
-
-#[derive(Deserialize)]
-pub struct Payload {}
 
 #[derive(Serialize)]
 pub struct Response {
     success: bool,
 }
 
-/// This route handles encrypted packages of data that come from Diia servers.
+/// This route handles encrypted packages of data that come from Diia Sharing.
 ///
 /// For now, the pipeline of handling the data is:
 /// 1. Decrypting the data using EUSignCP library.

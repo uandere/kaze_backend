@@ -20,8 +20,16 @@ pub struct EUSignConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct DiiaConfig {
+    pub acquirer_token: String,
+    pub auth_acquirer_token: String,
+    pub host: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub eusign: EUSignConfig,
+    pub diia: DiiaConfig,
 }
 
 impl Config {

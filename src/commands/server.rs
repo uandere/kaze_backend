@@ -1,6 +1,7 @@
 use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
 use crate::utils::config::Config;
 use crate::utils::db::{init_db_pool, setup_db, DbPool};
+use crate::utils::diia::refresh_diia_session_token;
 use crate::utils::eusign::*;
 use crate::utils::secrets::get_secret;
 use crate::utils::server_error::EusignError;
@@ -24,6 +25,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
+use tokio::sync::Mutex;
+use tokio::time::sleep;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
@@ -196,7 +199,24 @@ pub fn run(
             aws_sm_client,
             aws_s3_client,
             s3_bucket_name,
+            diia_session_token: Arc::new(Mutex::new("".into())),
         };
+
+        // Setting up cache renewal for Diia once per every ~two hours
+        let cloned_server_state = server_state.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut duration = Duration::from_secs(59 * 60 * 2);    // ~two hours
+
+                if let Err(e) = refresh_diia_session_token(cloned_server_state.clone()).await {
+                    error!("wasn't able to get Diia session token: {:?}", e);
+                    duration = Duration::from_secs(1);    // if failed, retrying in 1 sec
+                } else {
+                    info!("successfully refreshed Diia session token");
+                }
+                sleep(duration).await;
+            }
+        });
 
         let cors = CorsLayer::new()
             .allow_headers(Any)
@@ -264,6 +284,8 @@ pub struct ServerState {
     pub aws_s3_client: aws_sdk_s3::Client,
     /// AWS S3 bucket name
     pub s3_bucket_name: String,
+    /// Diia session token
+    pub diia_session_token: Arc<Mutex<String>>,
 }
 
 #[derive(Parser, Clone)]

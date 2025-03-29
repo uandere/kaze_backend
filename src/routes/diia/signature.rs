@@ -19,7 +19,13 @@ pub struct RequestId {
     seed: String,
 }
 
-/// This route handles signed hashes of the agreement.
+#[derive(Serialize)]
+pub struct Response {
+    success: bool,
+}
+
+
+/// This route handles signed hashes of the agreement that come from Diia Signature.
 ///
 /// For now, the pipeline of handling the data is:
 /// 1. Decrypting the hash using EUSignCP library.
@@ -30,7 +36,7 @@ pub struct RequestId {
 pub async fn handler(
     State(state): State<ServerState>,
     mut _multipart: Multipart,
-) -> Result<Json<()>, ServerError> {
+) -> Result<Json<Response>, ServerError> {
     // TODO
     // 1. Decrypting the hash using EUSignCP library.
 
@@ -87,5 +93,5 @@ pub async fn handler(
             std::future::ready(op)
         }).await;
 
-    Ok(Json(()))
+    Ok(Json(Response { success: true }))
 }
