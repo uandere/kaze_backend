@@ -88,8 +88,8 @@ pub async fn handler(
     let mut pdf = get_agreement_pdf(
         &state,
         Arc::new(AgreementProposalKey {
-            tenant_id: payload.tenant_id,
-            landlord_id: payload.landlord_id,
+            tenant_id: payload.tenant_id.clone(),
+            landlord_id: payload.landlord_id.clone(),
         }),
     )
     .await?;
@@ -135,10 +135,10 @@ pub async fn handler(
 
     // setting up the request
     let request = SignHashRequest {
-        offer_id: state.config.diia.offer_id,
+        offer_id: state.config.diia.offer_id.clone(),
         return_link: "https://mykaze.org".into(), // TODO: change this to the chat url
         request_id: serde_json::to_string(&request_id)?,
-        sign_algo: "DSTU",
+        sign_algo: Some("DSTU".into()),
         data: RequestData {
             hashed_files_signing: HashedFilesSigning {
                 hashed_files: vec![HashedFile {
@@ -160,7 +160,7 @@ pub async fn handler(
     let client = reqwest::Client::new();
     let response = client
         .post(endpoint)
-        .json(&request_body)
+        .json(&request)
         .send()
         .await?;
 
@@ -172,6 +172,6 @@ pub async fn handler(
             deeplink: api_response.deeplink,
         })
     } else {
-        Err(anyhow!("Diia host returned with status {}: {}", response.status(), response.text().await?))
+        Err(anyhow!("Diia host returned with status {}: {}", response.status(), response.text().await?).into())
     }
 }

@@ -10,13 +10,14 @@ use crate::{
 use axum::extract::{Json, Multipart, State};
 use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct RequestId {
     pub tenant_id: String,
     pub landlord_id: String,
     pub signed_by: String,
-    pub seed: String,
+    pub seed: Uuid,
 }
 
 #[derive(Serialize)]
@@ -56,7 +57,7 @@ pub async fn handler(
         tenant_id: "1".into(),
         landlord_id: "2".into(),
         signed_by: "1".into(),
-        seed: "123".into(),
+        seed: uuid::uuid!("12345678-1234-5678-1234-567812345678"),
     };
     let request_id = serde_json::to_string(&request_id)?;
     let RequestId {
