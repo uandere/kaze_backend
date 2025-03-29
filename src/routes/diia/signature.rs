@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct RequestId {
-    tenant_id: String,
-    landlord_id: String,
-    signed_by: String,
-    seed: String,
+    pub tenant_id: String,
+    pub landlord_id: String,
+    pub signed_by: String,
+    pub seed: String,
 }
 
 #[derive(Serialize)]

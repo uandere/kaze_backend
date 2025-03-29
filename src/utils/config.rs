@@ -24,6 +24,8 @@ pub struct DiiaConfig {
     pub acquirer_token: String,
     pub auth_acquirer_token: String,
     pub host: String,
+    pub branch_id: String,
+    pub offer_id: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

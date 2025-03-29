@@ -30,10 +30,10 @@ where
     }
 }
 
-pub struct EusignError(pub c_ulong);
+pub struct EUSignError(pub c_ulong);
 
-impl From<EusignError> for ServerError {
-    fn from(err: EusignError) -> Self {
+impl From<EUSignError> for ServerError {
+    fn from(err: EUSignError) -> Self {
         Self(anyhow!(format!("Eusign error: {}", unsafe {
             get_error_message(err.0)
         })))

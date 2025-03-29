@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use http::{
     header::{ACCEPT, AUTHORIZATION},
     HeaderMap, HeaderValue,
@@ -7,7 +5,6 @@ use http::{
 
 
 use crate::commands::server::ServerState;
-
 use super::server_error::ServerError;
 
 
@@ -26,7 +23,8 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
     // Make the GET request asynchronously
     let response = client
         .get(format!(
-            "https://api2s.diia.gov.ua/api/v1/auth/acquirer/{}",
+            "{}/api/v1/auth/acquirer/{}",
+            state.config.diia.host,
             state.config.diia.acquirer_token
         ))
         .headers(headers)

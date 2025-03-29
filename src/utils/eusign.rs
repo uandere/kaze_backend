@@ -16,7 +16,7 @@ use tracing::warn;
 
 use crate::commands::server::ServerState;
 
-use super::server_error::EusignError;
+use super::server_error::EUSignError;
 use super::{config::Config, server_error::ServerError};
 
 // Bring in all the bindgen-generated FFI:
@@ -624,19 +624,8 @@ pub static mut s_Iface: EU_INTERFACE = EU_INTERFACE {
 /// # Safety
 /// This function is inherently unsafe.
 /// It was battle-tested against UB or side-effects, and none was found.
-pub unsafe fn EULoad() -> c_int {
-    let ret = EUInitialize();
-    // In the C code, success was "1" if loaded, "0" if not.
-    // EUInitialize returns 0 if success, or an error code if not.
-    // If you found yourself asking "Why?" - don't worry. What did you
-    // expect from the non-opensourced cryptographic library, where developers
-    // are only writing documentation in their heads and also in CP1251-encoded
-    // Ukrainian appendix in the form of Microsoft Word document?
-    if ret == 0 {
-        1
-    } else {
-        0
-    }
+pub unsafe fn EULoad() -> c_ulong {
+    EUInitialize()
 }
 
 /// Return pointer to static interface of the EUSign library.
@@ -708,15 +697,22 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     if G_P_IFACE.is_null() {
         return "Library not loaded".to_string();
     }
-    let func = (*G_P_IFACE).GetErrorLangDesc.unwrap();
-    // C function signature: GetErrorLangDesc(error, EU_EN_LANG) -> *mut c_char
-    let c_ptr = func(dwError, EU_EN_LANG as u64);
-    if c_ptr.is_null() {
-        return "Unknown error".to_string();
+    let func = (*G_P_IFACE).GetErrorLangDesc;
+
+    match func {
+        Some(function) => {
+            let c_ptr = function(dwError, EU_EN_LANG as u64);
+            if c_ptr.is_null() {
+                return "Unknown error".to_string();
+            }
+            // Convert from C-string
+            let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
+            msg
+        }
+        None => {
+            "Couldn't get full error description".to_string()
+        },
     }
-    // Convert from C-string
-    let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
-    msg
 }
 
 /// Parse a JSON string containing an array of CASettings.
@@ -728,7 +724,7 @@ pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
 // The "Initialize()" logic from example usage
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
-pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
+pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EUSignError> {
     let mut dwError: c_ulong;
 
     // If we are using the function-pointer interface, do:
@@ -740,7 +736,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
     dwError = initialize_fn();
     if dwError != EU_ERROR_NONE as c_ulong {
         warn!("{}", get_error_message(dwError));
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // Example: set some runtime parameters
@@ -790,7 +786,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         dwExpireTime.into(),
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // Proxy settings
@@ -810,7 +806,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         1, // bProxySavePassword
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // OCSP settings
@@ -825,13 +821,13 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         pszOCSPPort.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     let set_ocsp_access_info_mode_settings = (*G_P_IFACE).SetOCSPAccessInfoModeSettings.unwrap();
     dwError = set_ocsp_access_info_mode_settings(1);
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // Read CAs from JSON
@@ -858,7 +854,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
                 c_port.as_ptr() as *mut c_char,
             );
             if dwError != EU_ERROR_NONE as c_ulong {
-                return Err(EusignError(dwError));
+                return Err(EUSignError(dwError));
             }
         }
     }
@@ -874,7 +870,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         c_tsp_port.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // LDAP settings (unused)
@@ -888,7 +884,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         ptr::null_mut(),
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // CMP settings (unused)
@@ -902,7 +898,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         c_empty.as_ptr() as *mut c_char,
     );
     if dwError != EU_ERROR_NONE as c_ulong {
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     // Load CA certificates:
@@ -912,7 +908,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
         if !res.is_empty() {
             let dwError = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
             if dwError != EU_ERROR_NONE as c_ulong {
-                return Err(EusignError(dwError));
+                return Err(EUSignError(dwError));
             }
         }
     }
@@ -923,7 +919,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
     dwError = ctx_create(&mut pvContext as *mut _);
     if dwError != EU_ERROR_NONE as c_ulong {
         warn!("{}", get_error_message(dwError));
-        return Err(EusignError(dwError));
+        return Err(EUSignError(dwError));
     }
 
     Ok(pvContext)
@@ -936,7 +932,7 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EusignError> {
 pub unsafe fn decrypt_customer_data(
     state: &ServerState,
     pszCustomerCrypto: &str,
-) -> Result<String, EusignError> {
+) -> Result<String, EUSignError> {
     let mut ppbCustomerData: *mut c_uchar = ptr::null_mut();
     let mut pdwCustomerData: c_ulong = 0;
 
@@ -964,7 +960,7 @@ pub unsafe fn decrypt_customer_data(
             &mut dwSenderCertLength as *mut _,
         );
         if err != EU_ERROR_NONE as c_ulong {
-            return Err(EusignError(err));
+            return Err(EUSignError(err));
         }
     }
 
@@ -980,7 +976,7 @@ pub unsafe fn decrypt_customer_data(
         );
         if err != EU_ERROR_NONE as c_ulong {
             free_memory(pbSenderCert);
-            return Err(EusignError(err));
+            return Err(EUSignError(err));
         }
     }
 
@@ -1002,7 +998,7 @@ pub unsafe fn decrypt_customer_data(
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbCustomerCrypto);
         free_memory(pbSenderCert);
-        return Err(EusignError(err));
+        return Err(EUSignError(err));
     }
 
     // free intermediate
@@ -1018,7 +1014,7 @@ pub unsafe fn decrypt_customer_data(
     );
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbDecryptedCustomerData);
-        return Err(EusignError(err));
+        return Err(EUSignError(err));
     }
 
     // 6) Verify signature
@@ -1034,7 +1030,7 @@ pub unsafe fn decrypt_customer_data(
     if err != EU_ERROR_NONE as c_ulong {
         free_sender_info(&mut pSenderInfo);
         free_memory(pbDecryptedCustomerData);
-        return Err(EusignError(err));
+        return Err(EUSignError(err));
     }
 
     // 4) Convert raw bytes to string

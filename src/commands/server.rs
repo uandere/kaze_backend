@@ -4,7 +4,7 @@ use crate::utils::db::{init_db_pool, setup_db, DbPool};
 use crate::utils::diia::refresh_diia_session_token;
 use crate::utils::eusign::*;
 use crate::utils::secrets::get_secret;
-use crate::utils::server_error::EusignError;
+use crate::utils::server_error::EUSignError;
 use crate::utils::shutdown::graceful_shutdown;
 use aws_config::{BehaviorVersion, Region};
 use axum::routing::{get, post};
@@ -134,11 +134,11 @@ pub fn run(
         let mut key_ctx: *mut c_void = ptr::null_mut();
 
         unsafe {
-            let loaded = EULoad();
-            if loaded == 0 {
+            let error_code = EULoad();
+            if error_code as u32 != EU_ERROR_NONE {
                 // Means it failed
-                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
-                return Err(EusignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
+                error!("{}", get_error_message(error_code));
+                return Err(EUSignError(error_code).into());
             }
 
             // 2) Get the interface pointer
@@ -146,7 +146,7 @@ pub fn run(
             if p_iface.is_null() {
                 error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
                 EUUnload();
-                return Err(EusignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
+                return Err(EUSignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
             }
             G_P_IFACE = p_iface;
 
@@ -162,13 +162,18 @@ pub fn run(
             let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
             let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
 
-            ctx_read_private_key_file(
+            let error_code = ctx_read_private_key_file(
                 lib_ctx,
                 c_key_path.as_ptr() as *mut c_char,
                 c_key_pwd.as_ptr() as *mut c_char,
                 &mut key_ctx,
                 ptr::null_mut(),
             );
+
+            if error_code as u32 != EU_ERROR_NONE {
+                error!("{}", get_error_message(error_code));
+                return Err(EUSignError(error_code).into());
+            }
         }
 
         let agreement_template_string = Arc::new(read_to_string(agreement_template_path).await?);
