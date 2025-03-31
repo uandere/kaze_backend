@@ -2,6 +2,7 @@ use crate::{commands::server::ServerState, utils::server_error::ServerError};
 use anyhow::anyhow;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -43,6 +44,8 @@ pub async fn handler(
     // let uid = verify_jwt(token, &state).await?;
     let uid = payload._uid;
 
+    info!("Point 0");
+
 
     let request_id = DiiaSharingRequestId {
         uid,
@@ -63,6 +66,8 @@ pub async fn handler(
         base_url, state.config.diia.branch_id
     );
 
+    info!("Point 1");
+
     // sending the request
     let client = reqwest::Client::new();
     let response = client
@@ -74,9 +79,14 @@ pub async fn handler(
         .send()
         .await?;
 
+    info!("Point 2");
+    
+
     // getting a deeplink and returning it
     if response.status().is_success() {
         let api_response: DiiaSharingResponse = response.json().await?;
+
+    info!("Point 3");
 
         Ok(Json(Response {
             deeplink: api_response.deeplink,

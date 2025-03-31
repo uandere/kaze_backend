@@ -232,7 +232,7 @@ pub fn run(
             .route("/", get(|| async { "Greetings from Kaze 🔑" }))
             .route(
                 "/diia/signature",
-                get(crate::routes::diia::signature::handler),
+                post(crate::routes::diia::signature::handler),
             )
             .route("/diia/sharing", post(crate::routes::diia::sharing::handler))
             .route(
@@ -241,7 +241,7 @@ pub fn run(
             )
             .route(
                 "/user/get_sharing_link",
-                get(crate::routes::user::get_sharing_link::handler),
+                post(crate::routes::user::get_sharing_link::handler),
             )
             .route(
                 "/agreement/generate",
@@ -253,11 +253,11 @@ pub fn run(
             )
             .route(
                 "/agreement/get_sign_link",
-                post(crate::routes::agreement::get_sign_link::handler),
+                get(crate::routes::agreement::get_sign_link::handler),
             )
             .route(
                 "/agreement/get",
-                post(crate::routes::agreement::get::get_latest_agreement),
+                get(crate::routes::agreement::get::get_latest_agreement),
             )
             .layer(cors)
             .with_state(server_state.clone());
