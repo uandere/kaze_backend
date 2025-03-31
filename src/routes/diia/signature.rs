@@ -1,10 +1,9 @@
-use std::sync::Arc;
+use std::{str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::{AgreementProposalKey, AgreementProposalValue},
-        server_error::ServerError,
+        cache::{AgreementProposalKey, AgreementProposalValue}, eusign::decrypt_customer_data, server_error::ServerError
     },
 };
 use axum::extract::{Json, Multipart, State};
@@ -37,11 +36,41 @@ pub struct Response {
 /// 5. Updating the cache (changing tenant_signed or landlord_singed)
 pub async fn handler(
     State(state): State<ServerState>,
-    mut _multipart: Multipart,
+    mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
-    info!("signing hanler");
     // TODO
     // 1. Decrypting the hash using EUSignCP library.
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let name = field.name().unwrap_or("<unnamed>").to_string();
+
+        let file_name = field
+            .file_name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{}.txt", name));
+        let content_type = field.content_type().map(|s| s.to_string());
+        let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
+
+        info!("Field Name: {}", name);
+        info!("File Name: {}", file_name);
+        if let Some(content_type) = content_type {
+            info!("Content Type: {}", content_type);
+        }
+        info!(
+            "Field Value (bytes): {:?}",
+            &value[..std::cmp::min(value.len(), 50)]
+        );
+
+        if name != "encodeData" {
+            continue;
+        }
+
+        let customer_data = from_utf8(&value)?;
+
+        // 2) DECRYPT THE DATA
+        let result = unsafe { decrypt_customer_data(&state, customer_data)? };
+
+        info!("The result of the decryption: {}", result);
+    }
 
     // TODO
     // 2. Getting corresponding agreement PDF from AWS S3.
