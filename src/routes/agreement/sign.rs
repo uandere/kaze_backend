@@ -80,9 +80,9 @@ pub async fn handler(
     Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     // checking authentication
-    let token = bearer.token();
+    // let token = bearer.token();
     // let uid = verify_jwt(token, &state).await?;
-    let uid = verify_jwt(token, &state).await.unwrap_or(payload._uid);
+    let uid = payload._uid;
     if uid != payload.landlord_id || uid != payload.tenant_id {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"
