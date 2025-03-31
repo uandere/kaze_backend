@@ -119,7 +119,19 @@ pub async fn handler(
                         }))
                     }
                 }
-                None => Op::Nop,
+                None => {
+                    if signed_by == tenant_id {
+                        Op::Put(Arc::new(AgreementProposalValue {
+                            tenant_signed: true,
+                            ..Default::default()
+                        }))
+                    } else {
+                        Op::Put(Arc::new(AgreementProposalValue {
+                            landlord_signed: true,
+                            ..Default::default()
+                        }))
+                    }
+                },
             };
 
             std::future::ready(op)

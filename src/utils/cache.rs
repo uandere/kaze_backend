@@ -32,7 +32,7 @@ pub struct AgreementProposalKey {
     pub landlord_id: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AgreementProposalValue {
     pub tenant_confirmed: bool,
     pub landlord_confirmed: bool,

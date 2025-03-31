@@ -248,8 +248,8 @@ pub fn run(
                 post(crate::routes::agreement::demo::handler),
             )
             .route(
-                "/agreement/sign",
-                post(crate::routes::agreement::sign::handler),
+                "/agreement/get_sign_link",
+                post(crate::routes::agreement::get_sign_link::handler),
             )
             .route(
                 "/agreement/get",

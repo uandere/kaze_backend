@@ -62,7 +62,6 @@ pub async fn handler(
 
     info!("Cache before /generate: {:?}", state.cache);
 
-    // If we got two confirmations, actually generating a file
     let result = state
         .cache
         .entry(AgreementProposalKey {
@@ -84,7 +83,19 @@ pub async fn handler(
                         }))
                     }
                 }
-                None => Op::Nop,
+                None => {
+                    if uid == payload.tenant_id {
+                        Op::Put(Arc::new(AgreementProposalValue {
+                            tenant_confirmed: true,
+                            ..Default::default()
+                        }))
+                    } else {
+                        Op::Put(Arc::new(AgreementProposalValue {
+                            landlord_confirmed: true,
+                            ..Default::default()
+                        }))
+                    }
+                },
             };
 
             std::future::ready(op)
@@ -94,7 +105,7 @@ pub async fn handler(
     info!("Cache after /generate: {:?}", state.cache);
 
     match result {
-        // if both parties agreed => generating the agreement.
+        // If we got two confirmations, actually generating a file
         moka::ops::compute::CompResult::ReplacedWith(entry) => {
             let val = entry.value();
             if !(val.landlord_confirmed && val.tenant_confirmed) {
