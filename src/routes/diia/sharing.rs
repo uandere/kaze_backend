@@ -1,8 +1,7 @@
 use std::str::from_utf8;
 
 use crate::{
-    commands::server::ServerState,
-    utils::{db, eusign::*, server_error::ServerError},
+    commands::server::ServerState, routes::user::get_sharing_link::DiiaSharingRequestId, utils::{db, eusign::*, server_error::ServerError}
 };
 use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
@@ -61,10 +60,8 @@ pub async fn handler(
         let result: DecryptionResult = serde_json::from_str(&result)?;
 
         // Getting user_id and random seed
-        let mut request_iter = result.request_id.split_whitespace();
-        let user_id = request_iter.next().context("cannot get user ID")?;
-        // Checking if there's seed
-        let _seed = request_iter.next().context("cannot get random seed")?;
+        let sharing_request_id: DiiaSharingRequestId = serde_json::from_str(&result.request_id)?;
+        let uid = sharing_request_id.uid;
 
         // Getting the actual passport data
         let data = result.data;
@@ -87,9 +84,9 @@ pub async fn handler(
         };
 
         // Store in database
-        db::store_document_unit(&state.db_pool, user_id, &unit).await?;
+        db::store_document_unit(&state.db_pool, &uid, &unit).await?;
 
-        info!("Added user with id={user_id} to the database!");
+        info!("Added user with id={uid} to the database!");
     }
 
     Ok(Json(Response { success: true }))

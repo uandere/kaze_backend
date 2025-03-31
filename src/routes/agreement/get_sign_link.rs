@@ -13,7 +13,6 @@ use uuid::Uuid;
 
 use crate::{
     commands::server::ServerState,
-    routes::diia::signature::RequestId,
     utils::{
         cache::AgreementProposalKey,
         eusign::{EU_CTX_HASH_ALGO_GOST34311, EU_ERROR_NONE, G_P_IFACE},
@@ -52,8 +51,16 @@ pub struct SignHashRequest {
     pub data: RequestData,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct SignHashRequestId {
+    pub tenant_id: String,
+    pub landlord_id: String,
+    pub signed_by: String,
+    pub seed: Uuid,
+}
+
 #[derive(Deserialize)]
-struct ApiResponse {
+struct SignHashResponse {
     deeplink: String,
 }
 
@@ -132,7 +139,7 @@ pub async fn handler(
     // encoding hash to base64
     let base64_hash = STANDARD.encode(hash_string);
 
-    let request_id = RequestId {
+    let request_id = SignHashRequestId {
         tenant_id: payload.tenant_id,
         landlord_id: payload.landlord_id,
         signed_by: uid,
@@ -164,11 +171,18 @@ pub async fn handler(
 
     // sending the request
     let client = reqwest::Client::new();
-    let response = client.post(endpoint).json(&request).send().await?;
+    let response = client
+        .post(endpoint)
+        .header("accept", "application/json")
+        .header("Authorization", format!("Bearer {}", state.diia_session_token.lock().await.clone()))
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await?;
 
     // getting a deeplink and returning it
     if response.status().is_success() {
-        let api_response: ApiResponse = response.json().await?;
+        let api_response: SignHashResponse = response.json().await?;
 
         Ok(Json(Response {
             deeplink: api_response.deeplink,

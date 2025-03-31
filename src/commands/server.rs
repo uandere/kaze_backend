@@ -240,6 +240,10 @@ pub fn run(
                 get(crate::routes::user::is_authorized::handler),
             )
             .route(
+                "/user/get_sharing_link",
+                get(crate::routes::user::get_sharing_link::handler),
+            )
+            .route(
                 "/agreement/generate",
                 post(crate::routes::agreement::generate::handler),
             )

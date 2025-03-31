@@ -7,12 +7,12 @@ use axum::extract::{Json, State};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct IsAuthorizedPayload {
+pub struct Payload {
     id: String,
 }
 
 #[derive(Serialize)]
-pub struct GenerateResponse {
+pub struct Response {
     name: String,
 }
 
@@ -20,13 +20,13 @@ pub struct GenerateResponse {
 /// Returns error otherwise.
 pub async fn handler(
     State(state): State<ServerState>,
-    payload: Json<IsAuthorizedPayload>,
-) -> Result<Json<GenerateResponse>, ServerError> {
+    payload: Json<Payload>,
+) -> Result<Json<Response>, ServerError> {
     let document = db::get_document_unit_from_db(&state.db_pool, &payload.id)
         .await
         .ok_or(anyhow!("cannot get tenant data from db"))?;
 
-    Ok(Json(GenerateResponse {
+    Ok(Json(Response {
         name: document.internal_passport.first_name_ua.clone(),
     }))
 }

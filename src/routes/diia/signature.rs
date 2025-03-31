@@ -1,24 +1,15 @@
 use std::{str::from_utf8, sync::Arc};
 
 use crate::{
-    commands::server::ServerState,
-    utils::{
+    commands::server::ServerState, routes::agreement::get_sign_link::SignHashRequestId, utils::{
         cache::{AgreementProposalKey, AgreementProposalValue}, eusign::decrypt_customer_data, server_error::ServerError
-    },
+    }
 };
 use axum::extract::{Json, Multipart, State};
 use moka::ops::compute::Op;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tracing::info;
-use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
-pub struct RequestId {
-    pub tenant_id: String,
-    pub landlord_id: String,
-    pub signed_by: String,
-    pub seed: Uuid,
-}
 
 #[derive(Serialize)]
 pub struct Response {
@@ -84,14 +75,14 @@ pub async fn handler(
     // TODO
     // 5. Updating the cache (changing tenant_signed or landlord_singed)
 
-    let request_id = RequestId {
+    let request_id = SignHashRequestId {
         tenant_id: "1".into(),
         landlord_id: "2".into(),
         signed_by: "1".into(),
         seed: uuid::uuid!("12345678-1234-5678-1234-567812345678"),
     };
     let request_id = serde_json::to_string(&request_id)?;
-    let RequestId {
+    let SignHashRequestId {
         tenant_id,
         landlord_id: _,
         signed_by,
