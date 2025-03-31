@@ -83,7 +83,7 @@ pub async fn handler(
     // let token = bearer.token();
     // let uid = verify_jwt(token, &state).await?;
     let uid = payload._uid;
-    if uid != payload.landlord_id || uid != payload.tenant_id {
+    if uid != payload.landlord_id && uid != payload.tenant_id {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"
         )
