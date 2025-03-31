@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use chrono::Utc;
@@ -19,11 +19,16 @@ use super::{db, server_error::ServerError};
 pub const CACHE_SAVE_LOCATION_DEFAULT: &str = "checkpoint/cache.json";
 
 pub type AgreementProposalCache = Cache<AgreementProposalKey, Arc<AgreementProposalValue>>;
-pub type AgreementProposalMap = HashMap<AgreementProposalKey, AgreementProposalValue>;
+
+#[derive(Serialize, Deserialize)]
+pub struct CacheEntry {
+    pub key: AgreementProposalKey,
+    pub value: AgreementProposalValue,
+}
 
 #[derive(Deserialize, Serialize)]
 pub struct SavedChallengeCache {
-    pub cache: AgreementProposalMap,
+    pub cache: Vec<CacheEntry>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Debug)]
@@ -138,8 +143,8 @@ pub async fn populate_cache_from_file(
         };
 
         // Populate the cache
-        for (key, value) in saved_cache.cache {
-            cache.insert(key, Arc::new(value)).await;
+        for entry in saved_cache.cache {
+            cache.insert(entry.key, Arc::new(entry.value)).await;
         }
 
         info!("CACHE IMPORTED SUCCESSFULLY",);
@@ -174,13 +179,16 @@ pub async fn save_cache_to_a_file(cache_save_location: &str, cache: AgreementPro
     };
 
     if let Some(mut file) = file_to_save_cache {
-        // Saving the cache
-        let mut result: HashMap<AgreementProposalKey, AgreementProposalValue> = HashMap::new();
+        // Create a vector of entries instead of a HashMap
+        let mut entries = Vec::new();
         for elem in cache.iter() {
-            result.insert((*elem.0).clone(), (*elem.1).clone());
+            entries.push(CacheEntry {
+                key: (*elem.0).clone(),
+                value: (*elem.1).clone(),
+            });
         }
 
-        let result = SavedChallengeCache { cache: result };
+        let result = SavedChallengeCache { cache: entries };
 
         match serde_json::to_string(&result) {
             Ok(value) => {
@@ -188,8 +196,8 @@ pub async fn save_cache_to_a_file(cache_save_location: &str, cache: AgreementPro
                     info!("CACHE DATA SAVED SUCCESSFULLY");
                 } else {
                     warn!(
-                                "ERROR: UNABLE TO SAVE CACHE (CANNOT WRITE TO A FILE). ALL STATE WILL BE LOST"
-                            );
+                        "ERROR: UNABLE TO SAVE CACHE (CANNOT WRITE TO A FILE). ALL STATE WILL BE LOST"
+                    );
                 }
             }
             Err(e) => {
