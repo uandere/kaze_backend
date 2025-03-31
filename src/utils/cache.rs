@@ -98,6 +98,7 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
         .async_eviction_listener(eviction_listener)
         .build()
 }
+
 /// A helper function used to resume the state of the server's cache from the JSON file.
 pub async fn populate_cache_from_file(
     cache_file_location: &str,
@@ -174,23 +175,29 @@ pub async fn save_cache_to_a_file(cache_save_location: &str, cache: AgreementPro
 
     if let Some(mut file) = file_to_save_cache {
         // Saving the cache
-        let mut result = HashMap::new();
+        let mut result: HashMap<AgreementProposalKey, AgreementProposalValue> = HashMap::new();
         for elem in cache.iter() {
             result.insert((*elem.0).clone(), (*elem.1).clone());
         }
 
         let result = SavedChallengeCache { cache: result };
 
-        if let Ok(value) = serde_json::to_string(&result) {
-            if file.write_all(value.as_bytes()).await.is_ok() {
-                info!("CACHE DATA SAVED SUCCESSFULLY");
-            } else {
-                warn!(
-                    "ERROR: UNABLE TO SAVE CACHE (CANNOT WRITE TO A FILE). ALL STATE WILL BE LOST"
+        match serde_json::to_string(&result) {
+            Ok(value) => {
+                if file.write_all(value.as_bytes()).await.is_ok() {
+                    info!("CACHE DATA SAVED SUCCESSFULLY");
+                } else {
+                    warn!(
+                                "ERROR: UNABLE TO SAVE CACHE (CANNOT WRITE TO A FILE). ALL STATE WILL BE LOST"
+                            );
+                }
+            }
+            Err(e) => {
+                info!(
+                    "ERROR: UNABLE TO SAVE CACHE (CANNOT SERIALIZE). ALL STATE WILL BE LOST: {}",
+                    e
                 );
             }
-        } else {
-            info!("ERROR: UNABLE TO SAVE CACHE (CANNOT SERIALIZE). ALL STATE WILL BE LOST");
         }
     }
 }
