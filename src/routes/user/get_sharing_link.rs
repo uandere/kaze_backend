@@ -1,9 +1,9 @@
-use crate::{commands::server::ServerState, utils::{diia::refresh_diia_session_token, server_error::ServerError}};
+use crate::{commands::server::ServerState, utils::server_error::ServerError};
 use anyhow::anyhow;
 use axum::{extract::State, Json};
 use http::{header::{ACCEPT, AUTHORIZATION}, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::error;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -42,7 +42,6 @@ pub async fn handler(
     Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     let uid = payload._uid;
-    info!("Point 0");
 
     let request_id = DiiaSharingRequestId {
         uid,
@@ -69,8 +68,6 @@ pub async fn handler(
         base_url, state.config.diia.branch_id
     );
 
-    info!("Point 1 - Endpoint: {}", endpoint);
-
     let token = state.diia_session_token.lock().await.clone();
 
     let mut headers = HeaderMap::new();
@@ -90,17 +87,14 @@ pub async fn handler(
         .await {
             Ok(resp) => resp,
             Err(e) => {
-                info!("Request failed: {:?}", e);
+                error!("Diia Sharing request failed: {:?}", e);
                 return Err(anyhow!("Failed to send request to Diia API: {}", e).into());
             }
         };
-
-    info!("Point 2 - Got response with status: {}", response.status());
     
     // getting a deeplink and returning it
     if response.status().is_success() {
         let body = response.text().await?;
-        info!("Response body: {}", body);
         
         let api_response: DiiaSharingResponse = match serde_json::from_str(&body) {
             Ok(resp) => resp,
@@ -109,7 +103,6 @@ pub async fn handler(
             }
         };
 
-        info!("Point 3 - Got deeplink");
         Ok(Json(Response {
             deeplink: api_response.deeplink,
         }))

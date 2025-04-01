@@ -59,7 +59,6 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
     // Store the raw response
     let mut lock = state.diia_session_token.lock().await;
     *lock = body.token;
-    info!("Stored raw token response");
 
     Ok(())
 }

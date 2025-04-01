@@ -3,7 +3,7 @@ use std::str::from_utf8;
 use crate::{
     commands::server::ServerState, routes::user::get_sharing_link::DiiaSharingRequestId, utils::{db, eusign::*, server_error::ServerError}
 };
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
 use serde::Serialize;
 use tracing::info;
