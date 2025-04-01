@@ -19,6 +19,7 @@ pub async fn upload_agreement_pdf(
         .bucket(&state.s3_bucket_name)
         .key(key)
         .body(body)
+        .content_type("application/pdf")  // Add this line
         .send()
         .await
         .map_err(ServerError::from)

@@ -56,7 +56,7 @@ pub async fn handler(
 
     // setting up the request
     let request = DiiaSharingRequest {
-        offer_id: state.config.diia.offer_id.clone(),
+        offer_id: state.config.diia.offer_sharing_id.clone(),
         return_link: "https://mykaze.org".into(),
         request_id: request_id_str,
     };
