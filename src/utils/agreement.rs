@@ -480,12 +480,21 @@ pub struct RealEstateData {
 }
 
 /// For meter reading, same approach with r#type => `type: "..."
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct MeterReadingData {
     #[serde(rename = "type")]
     pub r#type: String,
 
     pub readings: Vec<f32>,
+}
+
+impl Default for MeterReadingData {
+    fn default() -> Self {
+        Self {
+            r#type: "SingleRate".into(),
+            readings: vec![0.0],
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]

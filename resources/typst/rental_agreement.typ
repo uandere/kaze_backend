@@ -453,7 +453,7 @@
         День: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
         Ніч: #appendix_one_data.meter_readings.electricity.readings.at(1)
       ] 
-    } else {
+    } else if appendix_one_data.meter_readings.electricity.type == "TripleRate" {
       [
         Пік: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
         Полупік: #appendix_one_data.meter_readings.electricity.readings.at(1)\;
