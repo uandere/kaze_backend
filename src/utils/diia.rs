@@ -54,7 +54,7 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
 
     // Get the response body as text
     let body: SessionTokenResponse = serde_json::from_str(&response.text().await?)?;
-    info!("Successfully got Diia token response");
+    info!("Successfully got Diia token: {}", body.token);
 
     // Store the raw response
     let mut lock = state.diia_session_token.lock().await;

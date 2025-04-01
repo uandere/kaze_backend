@@ -8,6 +8,7 @@ use axum_extra::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
+use http::{header::{ACCEPT, AUTHORIZATION}, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -162,6 +163,15 @@ pub async fn handler(
         },
     };
 
+    let token = state.diia_session_token.lock().await.clone();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", token))?,
+    );
+
     // setting up endpoint
     let base_url = format!("{}/api/v2/acquirers/branch", state.config.diia.host);
     let endpoint = format!(
@@ -173,9 +183,7 @@ pub async fn handler(
     let client = reqwest::Client::new();
     let response = client
         .post(endpoint)
-        .header("accept", "application/json")
-        .header("Authorization", format!("Bearer {}", state.diia_session_token.lock().await.clone()))
-        .header("Content-Type", "application/json")
+        .headers(headers)
         .json(&request)
         .send()
         .await?;

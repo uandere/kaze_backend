@@ -1,6 +1,7 @@
 use crate::{commands::server::ServerState, utils::{diia::refresh_diia_session_token, server_error::ServerError}};
 use anyhow::anyhow;
 use axum::{extract::State, Json};
+use http::{header::{ACCEPT, AUTHORIZATION}, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
@@ -43,20 +44,6 @@ pub async fn handler(
     let uid = payload._uid;
     info!("Point 0");
 
-    // Check if the Diia session token is available
-    let diia_token = state.diia_session_token.lock().await.clone();
-    if diia_token.is_empty() {
-        // Token is empty, try to refresh it first
-        info!("Diia token is empty, attempting to refresh it");
-        refresh_diia_session_token(state.clone()).await?;
-        
-        // Get the refreshed token
-        let refreshed_token = state.diia_session_token.lock().await.clone();
-        if refreshed_token.is_empty() {
-            return Err(anyhow!("Failed to obtain Diia session token").into());
-        }
-    }
-
     let request_id = DiiaSharingRequestId {
         uid,
         seed: Uuid::new_v4(),
@@ -84,17 +71,20 @@ pub async fn handler(
 
     info!("Point 1 - Endpoint: {}", endpoint);
 
-    // Get token again in case it was refreshed
     let token = state.diia_session_token.lock().await.clone();
-    info!("Using Diia token (first 10 chars): {}", if token.len() > 10 { &token[0..10] } else { &token });
+
+    let mut headers = HeaderMap::new();
+    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", token))?,
+    );
 
     // sending the request with better error handling
     let client = reqwest::Client::new();
     let response = match client
         .post(&endpoint)
-        .header("accept", "application/json")
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Content-Type", "application/json")
+        .headers(headers)
         .json(&request)
         .send()
         .await {
