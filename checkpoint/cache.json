@@ -1,5 +1,1 @@
-{
-    "cache": {
-
-    }
-}
+{"cache":[{"key":{"tenant_id":"tenant1","landlord_id":"tenant1"},"value":{"tenant_confirmed":false,"landlord_confirmed":true,"tenant_signed":false,"landlord_signed":false}}]}
