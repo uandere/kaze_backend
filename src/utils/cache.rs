@@ -90,7 +90,7 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
         let res = match existing {
             Ok(Some(_)) => {
                 // Agreement already exists, no need to create again
-                info!("Agreement already exists in database, skipping insert");
+                warn!("Agreement already exists in database, skipping insert");
                 Ok(())
             }
             _ => {

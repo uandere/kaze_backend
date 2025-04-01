@@ -144,7 +144,7 @@ pub async fn handler(
 
     let document = typst::compile(&world)
         .output
-        .map_err(|_| anyhow!("cannot compile Typst document"))?;
+        .map_err(|e| anyhow!("cannot compile Typst document {:?}", e))?;
 
     let pdf = typst_pdf::pdf(&document, &PdfOptions::default()).expect("Error exporting PDF");
 
