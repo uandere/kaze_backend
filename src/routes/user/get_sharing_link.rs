@@ -126,8 +126,7 @@ pub async fn handler(
     } else {
         let error_body = response.text().await?;
         Err(anyhow!(
-            "Diia host returned error status {}: {}",
-            response.status(),
+            "Diia host returned error status: {}",
             error_body
         ).into())
     }
