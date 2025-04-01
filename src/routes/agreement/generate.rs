@@ -66,7 +66,7 @@ pub async fn handler(
         .cache
         .entry(AgreementProposalKey {
             tenant_id: payload.tenant_id.clone(),
-            landlord_id: payload.tenant_id.clone(),
+            landlord_id: payload.landlord_id.clone(),
         })
         .and_compute_with(|entry| {
             let op = match entry {
