@@ -78,24 +78,41 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
         let pool = pool.clone();
 
         async move {
-            let res = db::create_agreement(
-                &pool,
-                &db::Agreement {
-                    tenant_id: key.tenant_id.clone(),
-                    landlord_id: key.landlord_id.clone(),
-                    date: Utc::now().date_naive(),
-                },
-            )
-            .await;
+        // Check if agreement already exists
+        let existing = db::get_agreement(
+            &pool,
+            &key.tenant_id,
+            &key.landlord_id,
+            &Utc::now().date_naive(),
+        )
+        .await;
 
-            match res {
-                Ok(_) => info!("agreement proposal with key = {:?} is removed from cache: both parties agreed and signed", key),
-                // TODO: here we might want to consider recreating the entry with the last unmodified parameter, aka (true, true, false, true)
-                // and prompt the corresponding user to retry
-                Err(e) => error!("agreement proposal with key = {:?} is removed from cache, but was not added to database: {:?}", key, e),
+        let res = match existing {
+            Ok(Some(_)) => {
+                // Agreement already exists, no need to create again
+                info!("Agreement already exists in database, skipping insert");
+                Ok(())
             }
+            _ => {
+                // Create new agreement
+                db::create_agreement(
+                    &pool,
+                    &db::Agreement {
+                        tenant_id: key.tenant_id.clone(),
+                        landlord_id: key.landlord_id.clone(),
+                        date: Utc::now().date_naive(),
+                    },
+                )
+                .await
+            }
+        };
+
+        match res {
+            Ok(_) => info!("agreement proposal with key = {:?} is removed from cache: both parties agreed and signed", key),
+            Err(e) => error!("agreement proposal with key = {:?} is removed from cache, but was not added to database: {:?}", key, e),
         }
-        .boxed()
+    }
+    .boxed()
     };
 
     Cache::builder()
