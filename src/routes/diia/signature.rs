@@ -26,52 +26,52 @@ pub struct Response {
 /// 5. Updating the cache (changing tenant_signed or landlord_singed)
 pub async fn handler(
     State(state): State<ServerState>,
-    mut multipart: Multipart,
+    // mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
     // TODO
     // 1. Decrypting the hash using EUSignCP library.
 
     info!("Here 1!");
 
-    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
-    info!("Here 2!");
-        let name = field.name().unwrap_or("<unnamed>").to_string();
+    // while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+    // info!("Here 2!");
+    //     let name = field.name().unwrap_or("<unnamed>").to_string();
 
-        let file_name = field
-            .file_name()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("{}.txt", name));
-        let content_type = field.content_type().map(|s| s.to_string());
-        let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
+    //     let file_name = field
+    //         .file_name()
+    //         .map(|s| s.to_string())
+    //         .unwrap_or_else(|| format!("{}.txt", name));
+    //     let content_type = field.content_type().map(|s| s.to_string());
+    //     let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
 
-        info!("Here 3!");
+    //     info!("Here 3!");
 
 
-        info!("Field Name: {}", name);
-        info!("File Name: {}", file_name);
-        if let Some(content_type) = content_type {
-            info!("Content Type: {}", content_type);
-        }
-        info!(
-            "Field Value (bytes): {:?}",
-            &value[..std::cmp::min(value.len(), 50)]
-        );
+    //     info!("Field Name: {}", name);
+    //     info!("File Name: {}", file_name);
+    //     if let Some(content_type) = content_type {
+    //         info!("Content Type: {}", content_type);
+    //     }
+    //     info!(
+    //         "Field Value (bytes): {:?}",
+    //         &value[..std::cmp::min(value.len(), 50)]
+    //     );
 
-        info!("Here 4!");
+    //     info!("Here 4!");
 
-        if name != "encodeData" {
-            continue;
-        }
+    //     if name != "encodeData" {
+    //         continue;
+    //     }
 
-        let customer_data = from_utf8(&value)?;
+    //     let customer_data = from_utf8(&value)?;
 
-        // 2) DECRYPT THE DATA
-        let result = unsafe { decrypt_customer_data(&state, customer_data)? };
+    //     // 2) DECRYPT THE DATA
+    //     let result = unsafe { decrypt_customer_data(&state, customer_data)? };
 
-        info!("Here 5!");
+    //     info!("Here 5!");
 
-        info!("The result of the decryption: {}", result);
-    }
+    //     info!("The result of the decryption: {}", result);
+    // }
 
     // TODO
     // 2. Getting corresponding agreement PDF from AWS S3.

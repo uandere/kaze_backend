@@ -3,7 +3,7 @@ use http::{
     HeaderMap, HeaderValue,
 };
 use serde::Deserialize;
-use tracing::{error, info};
+use tracing::error;
 use anyhow::anyhow;
 
 
@@ -52,7 +52,6 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
 
     // Get the response body as text
     let body: SessionTokenResponse = serde_json::from_str(&response.text().await?)?;
-    info!("Successfully refreshed Diia token");
 
     // Store the raw response
     let mut lock = state.diia_session_token.lock().await;
