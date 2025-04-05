@@ -30,7 +30,11 @@ pub async fn handler(
 ) -> Result<Json<Response>, ServerError> {
     // TODO
     // 1. Decrypting the hash using EUSignCP library.
+
+    info!("Here 1!");
+
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+    info!("Here 2!");
         let name = field.name().unwrap_or("<unnamed>").to_string();
 
         let file_name = field
@@ -39,6 +43,9 @@ pub async fn handler(
             .unwrap_or_else(|| format!("{}.txt", name));
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
+
+        info!("Here 3!");
+
 
         info!("Field Name: {}", name);
         info!("File Name: {}", file_name);
@@ -50,6 +57,8 @@ pub async fn handler(
             &value[..std::cmp::min(value.len(), 50)]
         );
 
+        info!("Here 4!");
+
         if name != "encodeData" {
             continue;
         }
@@ -58,6 +67,8 @@ pub async fn handler(
 
         // 2) DECRYPT THE DATA
         let result = unsafe { decrypt_customer_data(&state, customer_data)? };
+
+        info!("Here 5!");
 
         info!("The result of the decryption: {}", result);
     }

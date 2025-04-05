@@ -34,8 +34,6 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
         state.config.diia.host,
         state.config.diia.acquirer_token
     );
-    info!("Refreshing Diia token - URL: {}", url);
-    info!("Using Authorization: Basic {}", state.config.diia.auth_acquirer_token);
 
     // Make the GET request asynchronously
     let response = client
@@ -54,7 +52,7 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
 
     // Get the response body as text
     let body: SessionTokenResponse = serde_json::from_str(&response.text().await?)?;
-    info!("Successfully got Diia token: {}", body.token);
+    info!("Successfully refreshed Diia token");
 
     // Store the raw response
     let mut lock = state.diia_session_token.lock().await;
