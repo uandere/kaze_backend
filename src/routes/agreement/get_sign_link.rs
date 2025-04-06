@@ -8,7 +8,10 @@ use axum_extra::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-use http::{header::{ACCEPT, AUTHORIZATION}, HeaderMap, HeaderValue};
+use http::{
+    header::{ACCEPT, AUTHORIZATION},
+    HeaderMap, HeaderValue,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -16,7 +19,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::AgreementProposalKey,
-        eusign::{EU_CTX_HASH_ALGO_GOST34311, EU_CTX_HASH_ALGO_SHA256, EU_ERROR_NONE, G_P_IFACE},
+        eusign::{EU_CTX_HASH_ALGO_SHA256, EU_ERROR_NONE, G_P_IFACE},
         s3::get_agreement_pdf,
         server_error::{EUSignError, ServerError},
         verify_jwt::verify_jwt,

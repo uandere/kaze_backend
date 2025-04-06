@@ -95,7 +95,7 @@ pub async fn handler(
                             ..Default::default()
                         }))
                     }
-                },
+                }
             };
 
             std::future::ready(op)

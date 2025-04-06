@@ -709,9 +709,7 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
             let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
             msg
         }
-        None => {
-            "Couldn't get full error description".to_string()
-        },
+        None => "Couldn't get full error description".to_string(),
     }
 }
 

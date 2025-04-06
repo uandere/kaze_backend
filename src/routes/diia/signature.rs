@@ -1,19 +1,15 @@
 use std::str::from_utf8;
 
-use crate::{
-    commands::server::ServerState, utils::server_error::ServerError
-};
+use crate::{commands::server::ServerState, utils::server_error::ServerError};
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use serde::Serialize;
 use tracing::info;
 
-
 #[derive(Serialize)]
 pub struct Response {
     success: bool,
 }
-
 
 /// This route handles signed hashes of the agreement that come from Diia Signature.
 ///
@@ -33,7 +29,7 @@ pub async fn handler(
     info!("Here 1!");
 
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
-    info!("Here 2!");
+        info!("Here 2!");
         let name = field.name().unwrap_or("<unnamed>").to_string();
 
         let file_name = field
@@ -44,7 +40,6 @@ pub async fn handler(
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
 
         info!("Here 3!");
-
 
         info!("Field Name: {}", name);
         info!("File Name: {}", file_name);

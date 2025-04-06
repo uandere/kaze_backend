@@ -1,7 +1,10 @@
 use crate::{commands::server::ServerState, utils::server_error::ServerError};
 use anyhow::anyhow;
 use axum::{extract::State, Json};
-use http::{header::{ACCEPT, AUTHORIZATION}, HeaderMap, HeaderValue};
+use http::{
+    header::{ACCEPT, AUTHORIZATION},
+    HeaderMap, HeaderValue,
+};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
@@ -84,22 +87,25 @@ pub async fn handler(
         .headers(headers)
         .json(&request)
         .send()
-        .await {
-            Ok(resp) => resp,
-            Err(e) => {
-                error!("Diia Sharing request failed: {:?}", e);
-                return Err(anyhow!("Failed to send request to Diia API: {}", e).into());
-            }
-        };
-    
+        .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            error!("Diia Sharing request failed: {:?}", e);
+            return Err(anyhow!("Failed to send request to Diia API: {}", e).into());
+        }
+    };
+
     // getting a deeplink and returning it
     if response.status().is_success() {
         let body = response.text().await?;
-        
+
         let api_response: DiiaSharingResponse = match serde_json::from_str(&body) {
             Ok(resp) => resp,
             Err(e) => {
-                return Err(anyhow!("Failed to parse Diia API response: {}, Body: {}", e, body).into());
+                return Err(
+                    anyhow!("Failed to parse Diia API response: {}, Body: {}", e, body).into(),
+                );
             }
         };
 
@@ -108,9 +114,6 @@ pub async fn handler(
         }))
     } else {
         let error_body = response.text().await?;
-        Err(anyhow!(
-            "Diia host returned error status: {}",
-            error_body
-        ).into())
+        Err(anyhow!("Diia host returned error status: {}", error_body).into())
     }
 }

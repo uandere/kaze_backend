@@ -211,11 +211,11 @@ pub fn run(
         let cloned_server_state = server_state.clone();
         tokio::spawn(async move {
             loop {
-                let mut duration = Duration::from_secs(59 * 60 * 2);    // ~two hours
+                let mut duration = Duration::from_secs(59 * 60 * 2); // ~two hours
 
                 if let Err(e) = refresh_diia_session_token(cloned_server_state.clone()).await {
                     error!("wasn't able to get Diia session token: {:?}", e);
-                    duration = Duration::from_secs(1);    // if failed, retrying in 1 sec
+                    duration = Duration::from_secs(1); // if failed, retrying in 1 sec
                 } else {
                     info!("successfully refreshed Diia session token");
                 }
@@ -257,7 +257,11 @@ pub fn run(
             )
             .route(
                 "/agreement/get",
-                get(crate::routes::agreement::get::get_latest_agreement),
+                get(crate::routes::agreement::get::handler),
+            )
+            .route(
+                "/agreement/status",
+                get(crate::routes::agreement::status::handler),
             )
             .layer(cors)
             .with_state(server_state.clone());

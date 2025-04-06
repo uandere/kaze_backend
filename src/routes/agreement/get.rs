@@ -20,8 +20,8 @@ pub struct Payload {
     pub landlord_id: String,
 }
 
-/// Generates rental ageement between tenant and landlord.
-pub async fn get_latest_agreement(
+/// Retuns the data about the latest rental ageement between tenant and landlord.
+pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,

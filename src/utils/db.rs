@@ -284,6 +284,41 @@ pub async fn get_agreements_for_landlord(
     Ok(agreements)
 }
 
+pub async fn get_agreements_for_tenant_and_landlord(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+) -> Result<Vec<Agreement>, ServerError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            tenant_id,
+            landlord_id,
+            date
+        FROM agreements
+        WHERE tenant_id = $1
+        AND landlord_id = $2
+        ORDER BY date DESC
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .fetch_all(pool)
+    .await
+    .context("Failed to fetch tenant agreements")?;
+
+    let agreements = rows
+        .into_iter()
+        .map(|row| Agreement {
+            tenant_id: row.get("tenant_id"),
+            landlord_id: row.get("landlord_id"),
+            date: row.get("date"),
+        })
+        .collect();
+
+    Ok(agreements)
+}
+
 /// Delete an agreement from the database
 pub async fn delete_agreement(
     pool: &DbPool,

@@ -19,7 +19,7 @@ pub async fn upload_agreement_pdf(
         .bucket(&state.s3_bucket_name)
         .key(key)
         .body(body)
-        .content_type("application/pdf")  // Add this line
+        .content_type("application/pdf") // Add this line
         .send()
         .await
         .map_err(ServerError::from)
@@ -29,8 +29,12 @@ fn get_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
     key.tenant_id.clone() + "_" + &key.landlord_id
 }
 
-pub async fn get_agreement_pdf(state: &ServerState, agreement_proposal_key: Arc<AgreementProposalKey>) -> Result<Vec<u8>, ServerError> {
-    let mut object = state.aws_s3_client
+pub async fn get_agreement_pdf(
+    state: &ServerState,
+    agreement_proposal_key: Arc<AgreementProposalKey>,
+) -> Result<Vec<u8>, ServerError> {
+    let mut object = state
+        .aws_s3_client
         .get_object()
         .bucket(state.s3_bucket_name.clone())
         .key(get_key_for_s3(agreement_proposal_key))
@@ -39,9 +43,12 @@ pub async fn get_agreement_pdf(state: &ServerState, agreement_proposal_key: Arc<
 
     let mut result = vec![];
 
-    while let Some(bytes) = object.body.try_next().await.map_err(|err| {
-        anyhow!("Failed to read from S3 download stream: {err:?}")
-    })? {
+    while let Some(bytes) = object
+        .body
+        .try_next()
+        .await
+        .map_err(|err| anyhow!("Failed to read from S3 download stream: {err:?}"))?
+    {
         result.append(&mut bytes.to_vec());
     }
 

@@ -1,20 +1,18 @@
+use anyhow::anyhow;
 use http::{
     header::{ACCEPT, AUTHORIZATION},
     HeaderMap, HeaderValue,
 };
 use serde::Deserialize;
 use tracing::error;
-use anyhow::anyhow;
 
-
-use crate::commands::server::ServerState;
 use super::server_error::ServerError;
+use crate::commands::server::ServerState;
 
 #[derive(Deserialize)]
 pub struct SessionTokenResponse {
     token: String,
 }
-
 
 /// This function refreshes the Diia session token.
 pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), ServerError> {
@@ -31,22 +29,20 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
     // Log the exact request we're making for debugging
     let url = format!(
         "{}/api/v1/auth/acquirer/{}",
-        state.config.diia.host,
-        state.config.diia.acquirer_token
+        state.config.diia.host, state.config.diia.acquirer_token
     );
 
     // Make the GET request asynchronously
-    let response = client
-        .get(&url)
-        .headers(headers)
-        .send()
-        .await?;
+    let response = client.get(&url).headers(headers).send().await?;
 
     // Check the status code - important!
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await?;
-        error!("Failed to refresh Diia token. Status: {}, Response: {}", status, error_text);
+        error!(
+            "Failed to refresh Diia token. Status: {}, Response: {}",
+            status, error_text
+        );
         return Err(anyhow!("Diia API returned error status {}: {}", status, error_text).into());
     }
 

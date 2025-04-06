@@ -1,7 +1,9 @@
 use std::str::from_utf8;
 
 use crate::{
-    commands::server::ServerState, routes::user::get_sharing_link::DiiaSharingRequestId, utils::{db, eusign::*, server_error::ServerError}
+    commands::server::ServerState,
+    routes::user::get_sharing_link::DiiaSharingRequestId,
+    utils::{db, eusign::*, server_error::ServerError},
 };
 use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
