@@ -40,8 +40,6 @@ pub async fn handler(
     State(state): State<ServerState>,
     Json(payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
-    info!("Payload: {}", serde_json::to_string(&payload)?);
-
     let typst_code = generate(
         &state,
         Arc::new(payload.tenant),

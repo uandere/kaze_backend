@@ -3,7 +3,7 @@ use crate::{
     utils::{db, server_error::ServerError},
 };
 use anyhow::anyhow;
-use axum::extract::{Json, State};
+use axum::extract::{Json, Query, State};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -20,7 +20,7 @@ pub struct Response {
 /// Returns error otherwise.
 pub async fn handler(
     State(state): State<ServerState>,
-    payload: Json<Payload>,
+    payload: Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     let document = db::get_document_unit_from_db(&state.db_pool, &payload.id)
         .await

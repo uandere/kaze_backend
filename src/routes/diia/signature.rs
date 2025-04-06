@@ -1,20 +1,38 @@
-use std::{str::from_utf8, sync::Arc};
+use std::{ffi::c_char, str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
-    utils::{cache::AgreementProposalKey, s3::get_agreement_pdf, server_error::ServerError},
+    utils::{
+        cache::AgreementProposalKey,
+        eusign::G_P_IFACE,
+        s3::get_agreement_pdf,
+        server_error::ServerError,
+    },
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use http::HeaderMap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 #[derive(Serialize)]
 pub struct Response {
     success: bool,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedItems {
+    pub name: String,
+    pub signature: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedHash {
+    pub signed_items: Vec<SignedItems>,
 }
 
 /// This route handles signed hashes of the agreement that come from Diia Signature.
@@ -67,27 +85,59 @@ pub async fn handler(
         // 2) DECODE THE DATA FROM BASE64
         let result = BASE64_STANDARD.decode(value)?;
         let result = from_utf8(&result)?;
+        let result: SignedHash = serde_json::from_str(result)?;
 
         info!("Here 5!");
 
-        info!("The result of the decoding: {}", result);
+        info!("The result of the decoding: {:?}", result);
 
         // 2. Getting corresponding agreement PDF from AWS S3.
-        let _sign_request_id: SignHashRequestId = serde_json::from_str(
+        let SignHashRequestId {
+            tenant_id,
+            landlord_id,
+            signed_by,
+            ..
+        } = serde_json::from_str(
             headers
                 .get("X-Document-Request-Trace-Id")
                 .ok_or(anyhow!("wasn't able to get sign hash request id header"))?
                 .to_str()?,
         )?;
 
-        // let mut pdf = get_agreement_pdf(
-        //     &state,
-        //     Arc::new(AgreementProposalKey {
-        //         tenant_id: payload.tenant_id.clone(),
-        //         landlord_id: payload.landlord_id.clone(),
-        //     }),
-        // )
-        // .await?;
+        let _pdf = get_agreement_pdf(
+            &state,
+            Arc::new(AgreementProposalKey {
+                tenant_id: tenant_id.clone(),
+                landlord_id: landlord_id.clone(),
+            }),
+        )
+        .await?;
+
+        let cache_entry = state
+            .cache
+            .get(&AgreementProposalKey {
+                tenant_id: tenant_id.clone(),
+                landlord_id: landlord_id.clone(),
+            })
+            .await
+            .ok_or(anyhow!("cannot sign: agreement doesn't exist"))?;
+
+        // if other party already signed, incrementing index
+        let _signature_idx = if cache_entry.landlord_signed || cache_entry.tenant_signed {
+            1_u64
+        } else {
+            0
+        };
+        
+        let _signature = result.signed_items.first().context("signatory didn't sign any file")?.signature.as_bytes();
+
+        unsafe {
+            let _ctx_get_signer_info = (*G_P_IFACE)
+                .CtxGetSignerInfo
+                .context("wasn't able to get get_signer_info handler")?;
+
+            // ctx_get_signer_info(state.ctx.lib_ctx, signature_idx, signature.as_mut_ptr(), signature.len(), );
+        }
 
         // TODO
         // 3. Adding signature to the file.
