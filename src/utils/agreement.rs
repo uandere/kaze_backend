@@ -807,8 +807,16 @@ pub struct RentData {
     pub min_notice_days_for_visit: u8,
     pub additional_tenants: Vec<String>,
     pub allowed_animals: Vec<String>,
-    pub additional_property: HashMap<String, u64>,
+    // TODO: this needs to be changed
+    pub additional_property: Vec<AdditionalPropertyUnit>,
     pub meter_readings: MeterReadings,
+}
+
+#[derive(Deserialize, Serialize, Default)]
+pub struct AdditionalPropertyUnit {
+    name: String,
+    currency: String,
+    price: u64,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -982,7 +990,12 @@ pub async fn generate(
     };
 
     // 11) AppendixOne
-    let additional_property = rent_data.additional_property;
+    // TODO: change this to the real price list
+    let additional_property = rent_data
+        .additional_property
+        .into_iter()
+        .map(|val| (val.name, 1_u64))
+        .collect::<HashMap<_, _>>();
 
     // TODO: hardcoded data
     let fun_appendix_one = AppendixOne {

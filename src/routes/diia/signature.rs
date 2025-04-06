@@ -2,10 +2,13 @@ use std::{str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
+    routes::agreement::get_sign_link::SignHashRequestId,
     utils::{cache::AgreementProposalKey, s3::get_agreement_pdf, server_error::ServerError},
 };
+use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
+use http::HeaderMap;
 use serde::Serialize;
 use tracing::info;
 
@@ -24,6 +27,7 @@ pub struct Response {
 /// 5. Updating the cache (changing tenant_signed or landlord_singed)
 pub async fn handler(
     State(state): State<ServerState>,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
     // TODO
@@ -69,7 +73,12 @@ pub async fn handler(
         info!("The result of the decoding: {}", result);
 
         // 2. Getting corresponding agreement PDF from AWS S3.
-        // let sign_request_id: Sign
+        let _sign_request_id: SignHashRequestId = serde_json::from_str(
+            headers
+                .get("X-Document-Request-Trace-Id")
+                .ok_or(anyhow!("wasn't able to get sign hash request id header"))?
+                .to_str()?,
+        )?;
 
         // let mut pdf = get_agreement_pdf(
         //     &state,
