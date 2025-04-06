@@ -1,6 +1,9 @@
-use std::str::from_utf8;
+use std::{str::from_utf8, sync::Arc};
 
-use crate::{commands::server::ServerState, utils::server_error::ServerError};
+use crate::{
+    commands::server::ServerState,
+    utils::{cache::AgreementProposalKey, s3::get_agreement_pdf, server_error::ServerError},
+};
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use serde::Serialize;
@@ -63,73 +66,82 @@ pub async fn handler(
 
         info!("Here 5!");
 
-        info!("The result of the decryption: {}", result);
+        info!("The result of the decoding: {}", result);
+
+        // 2. Getting corresponding agreement PDF from AWS S3.
+        // let sign_request_id: Sign
+
+        // let mut pdf = get_agreement_pdf(
+        //     &state,
+        //     Arc::new(AgreementProposalKey {
+        //         tenant_id: payload.tenant_id.clone(),
+        //         landlord_id: payload.landlord_id.clone(),
+        //     }),
+        // )
+        // .await?;
+
+        // TODO
+        // 3. Adding signature to the file.
+
+        // TODO
+        // 4. Updating S3 entry.
+
+        // TODO
+        // 5. Updating the cache (changing tenant_signed or landlord_singed)
+
+        // let request_id = SignHashRequestId {
+        //     tenant_id: "1".into(),
+        //     landlord_id: "2".into(),
+        //     signed_by: "1".into(),
+        //     seed: uuid::uuid!("12345678-1234-5678-1234-567812345678"),
+        // };
+        // let request_id = serde_json::to_string(&request_id)?;
+        // let SignHashRequestId {
+        //     tenant_id,
+        //     landlord_id: _,
+        //     signed_by,
+        //     ..
+        // } = serde_json::from_str(&request_id)?;
+
+        // state
+        //     .cache
+        //     .entry(AgreementProposalKey {
+        //         tenant_id: tenant_id.clone(),
+        //         landlord_id: tenant_id.clone(),
+        //     })
+        //     .and_compute_with(|entry| {
+        //         let op = match entry {
+        //             Some(entry) => {
+        //                 if signed_by == tenant_id {
+        //                     Op::Put(Arc::new(AgreementProposalValue {
+        //                         tenant_signed: true,
+        //                         ..*entry.into_value().as_ref()
+        //                     }))
+        //                 } else {
+        //                     Op::Put(Arc::new(AgreementProposalValue {
+        //                         landlord_signed: true,
+        //                         ..*entry.into_value().as_ref()
+        //                     }))
+        //                 }
+        //             }
+        //             None => {
+        //                 if signed_by == tenant_id {
+        //                     Op::Put(Arc::new(AgreementProposalValue {
+        //                         tenant_signed: true,
+        //                         ..Default::default()
+        //                     }))
+        //                 } else {
+        //                     Op::Put(Arc::new(AgreementProposalValue {
+        //                         landlord_signed: true,
+        //                         ..Default::default()
+        //                     }))
+        //                 }
+        //             },
+        //         };
+
+        //         std::future::ready(op)
+        //     }).await;
     }
-
-    // TODO
-    // 2. Getting corresponding agreement PDF from AWS S3.
-
-    // TODO
-    // 3. Adding signature to the file.
-
-    // TODO
-    // 4. Updating S3 entry.
-
-    // TODO
-    // 5. Updating the cache (changing tenant_signed or landlord_singed)
-
-    // let request_id = SignHashRequestId {
-    //     tenant_id: "1".into(),
-    //     landlord_id: "2".into(),
-    //     signed_by: "1".into(),
-    //     seed: uuid::uuid!("12345678-1234-5678-1234-567812345678"),
-    // };
-    // let request_id = serde_json::to_string(&request_id)?;
-    // let SignHashRequestId {
-    //     tenant_id,
-    //     landlord_id: _,
-    //     signed_by,
-    //     ..
-    // } = serde_json::from_str(&request_id)?;
-
-    // state
-    //     .cache
-    //     .entry(AgreementProposalKey {
-    //         tenant_id: tenant_id.clone(),
-    //         landlord_id: tenant_id.clone(),
-    //     })
-    //     .and_compute_with(|entry| {
-    //         let op = match entry {
-    //             Some(entry) => {
-    //                 if signed_by == tenant_id {
-    //                     Op::Put(Arc::new(AgreementProposalValue {
-    //                         tenant_signed: true,
-    //                         ..*entry.into_value().as_ref()
-    //                     }))
-    //                 } else {
-    //                     Op::Put(Arc::new(AgreementProposalValue {
-    //                         landlord_signed: true,
-    //                         ..*entry.into_value().as_ref()
-    //                     }))
-    //                 }
-    //             }
-    //             None => {
-    //                 if signed_by == tenant_id {
-    //                     Op::Put(Arc::new(AgreementProposalValue {
-    //                         tenant_signed: true,
-    //                         ..Default::default()
-    //                     }))
-    //                 } else {
-    //                     Op::Put(Arc::new(AgreementProposalValue {
-    //                         landlord_signed: true,
-    //                         ..Default::default()
-    //                     }))
-    //                 }
-    //             },
-    //         };
-
-    //         std::future::ready(op)
-    //     }).await;
 
     Ok(Json(Response { success: true }))
 }
