@@ -16,7 +16,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::AgreementProposalKey,
-        eusign::{EU_CTX_HASH_ALGO_GOST34311, EU_ERROR_NONE, G_P_IFACE},
+        eusign::{EU_CTX_HASH_ALGO_GOST34311, EU_CTX_HASH_ALGO_SHA256, EU_ERROR_NONE, G_P_IFACE},
         s3::get_agreement_pdf,
         server_error::{EUSignError, ServerError},
         verify_jwt::verify_jwt,
@@ -121,7 +121,7 @@ pub async fn handler(
 
         let error_code = ctx_hash_data_func(
             state.ctx.lib_ctx as *mut std::ffi::c_void,
-            EU_CTX_HASH_ALGO_GOST34311.into(),
+            EU_CTX_HASH_ALGO_SHA256.into(),
             null_mut(),
             0,
             pdf.as_mut_ptr(),

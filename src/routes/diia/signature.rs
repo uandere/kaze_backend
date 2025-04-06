@@ -1,11 +1,10 @@
 use std::str::from_utf8;
 
 use crate::{
-    commands::server::ServerState, utils::{
-        eusign::decrypt_customer_data, server_error::ServerError
-    }
+    commands::server::ServerState, utils::server_error::ServerError
 };
 use axum::extract::{Json, Multipart, State};
+use base64::{prelude::BASE64_STANDARD, Engine as _};
 use serde::Serialize;
 use tracing::info;
 
@@ -63,10 +62,9 @@ pub async fn handler(
             continue;
         }
 
-        let customer_data = from_utf8(&value)?;
-
-        // 2) DECRYPT THE DATA
-        let result = unsafe { decrypt_customer_data(&state, customer_data)? };
+        // 2) DECODE THE DATA FROM BASE64
+        let result = BASE64_STANDARD.decode(value)?;
+        let result = from_utf8(&result)?;
 
         info!("Here 5!");
 
