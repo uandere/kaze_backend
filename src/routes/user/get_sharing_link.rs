@@ -1,6 +1,7 @@
-use crate::{commands::server::ServerState, utils::server_error::ServerError};
+use crate::{commands::server::ServerState, utils::{server_error::ServerError, verify_jwt::verify_jwt}};
 use anyhow::anyhow;
 use axum::{extract::State, Json};
+use axum_extra::{headers::{authorization::Bearer, Authorization}, TypedHeader};
 use http::{
     header::{ACCEPT, AUTHORIZATION},
     HeaderMap, HeaderValue,
@@ -11,8 +12,8 @@ use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct Payload {
-    /// This is a backdoor for testing purposes
-    pub _uid: String,
+    // /// This is a backdoor for testing purposes
+    // pub _uid: String,
 }
 
 #[derive(Serialize)]
@@ -42,9 +43,12 @@ pub struct DiiaSharingResponse {
 /// Generates an authorization link for Diia sharing.
 pub async fn handler(
     State(state): State<ServerState>,
-    Json(payload): Json<Payload>,
+    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
+    // Query(payload): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
-    let uid = payload._uid;
+        let token = bearer.token();
+        let uid = verify_jwt(token, &state).await?;
+        // let uid = payload._uid;
 
     let request_id = DiiaSharingRequestId {
         uid,

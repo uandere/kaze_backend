@@ -1,12 +1,10 @@
-use std::{ffi::c_char, str::from_utf8, sync::Arc};
+use std::{ffi::c_char, ptr::null_mut, str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
     utils::{
-        cache::AgreementProposalKey,
-        eusign::G_P_IFACE,
-        s3::get_agreement_pdf,
+        cache::AgreementProposalKey, eusign::G_P_IFACE, s3::get_agreement_pdf,
         server_error::ServerError,
     },
 };
@@ -85,7 +83,7 @@ pub async fn handler(
         // 2) DECODE THE DATA FROM BASE64
         let result = BASE64_STANDARD.decode(value)?;
         let result = from_utf8(&result)?;
-        let result: SignedHash = serde_json::from_str(result)?;
+        let mut result: SignedHash = serde_json::from_str(result)?;
 
         info!("Here 5!");
 
@@ -104,7 +102,7 @@ pub async fn handler(
                 .to_str()?,
         )?;
 
-        let _pdf = get_agreement_pdf(
+        let pdf = get_agreement_pdf(
             &state,
             Arc::new(AgreementProposalKey {
                 tenant_id: tenant_id.clone(),
@@ -123,20 +121,38 @@ pub async fn handler(
             .ok_or(anyhow!("cannot sign: agreement doesn't exist"))?;
 
         // if other party already signed, incrementing index
-        let _signature_idx = if cache_entry.landlord_signed || cache_entry.tenant_signed {
+        let signature_idx = if cache_entry.landlord_signed || cache_entry.tenant_signed {
             1_u64
         } else {
             0
         };
-        
-        let _signature = result.signed_items.first().context("signatory didn't sign any file")?.signature.as_bytes();
+
+        let signature = unsafe {
+            result
+                .signed_items
+                .first_mut()
+                .context("signatory didn't sign any file")?
+                .signature
+                .as_bytes_mut()
+        };
+        let mut cert_info = null_mut();
+        let mut cert = null_mut();
+        let cert_size = null_mut();
 
         unsafe {
-            let _ctx_get_signer_info = (*G_P_IFACE)
+            let ctx_get_signer_info = (*G_P_IFACE)
                 .CtxGetSignerInfo
                 .context("wasn't able to get get_signer_info handler")?;
 
-            // ctx_get_signer_info(state.ctx.lib_ctx, signature_idx, signature.as_mut_ptr(), signature.len(), );
+            ctx_get_signer_info(
+                state.ctx.lib_ctx as *mut std::ffi::c_void,
+                signature_idx,
+                signature.as_mut_ptr(),
+                signature.len().try_into()?,
+                &mut cert_info,
+                &mut cert,
+                cert_size,
+            );
         }
 
         // TODO
