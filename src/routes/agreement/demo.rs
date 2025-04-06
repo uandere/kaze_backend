@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use axum::{extract::State, response::Response, Json};
 use http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use typst_pdf::PdfOptions;
 
 use crate::{
@@ -39,6 +40,8 @@ pub async fn handler(
     State(state): State<ServerState>,
     Json(payload): Json<Payload>,
 ) -> Result<Response, ServerError> {
+    info!("Payload: {}", serde_json::to_string(&payload)?);
+
     let typst_code = generate(
         &state,
         Arc::new(payload.tenant),
