@@ -241,7 +241,7 @@ pub fn run(
             )
             .route(
                 "/user/get_sharing_link",
-                post(crate::routes::user::get_sharing_link::handler),
+                get(crate::routes::user::get_sharing_link::handler),
             )
             .route(
                 "/agreement/generate",
