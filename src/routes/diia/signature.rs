@@ -1,11 +1,13 @@
-use std::{ffi::c_char, ptr::null_mut, str::from_utf8, sync::Arc};
+use std::{ptr::null_mut, str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
     utils::{
-        cache::AgreementProposalKey, eusign::G_P_IFACE, s3::get_agreement_pdf,
-        server_error::ServerError,
+        cache::AgreementProposalKey,
+        eusign::{EU_ERROR_NONE, G_P_IFACE},
+        s3::get_agreement_pdf,
+        server_error::{EUSignError, ServerError},
     },
 };
 use anyhow::{anyhow, Context};
@@ -93,7 +95,6 @@ pub async fn handler(
         let SignHashRequestId {
             tenant_id,
             landlord_id,
-            signed_by,
             ..
         } = serde_json::from_str(
             headers
@@ -102,7 +103,7 @@ pub async fn handler(
                 .to_str()?,
         )?;
 
-        let pdf = get_agreement_pdf(
+        let _pdf = get_agreement_pdf(
             &state,
             Arc::new(AgreementProposalKey {
                 tenant_id: tenant_id.clone(),
@@ -142,9 +143,17 @@ pub async fn handler(
         unsafe {
             let ctx_get_signer_info = (*G_P_IFACE)
                 .CtxGetSignerInfo
-                .context("wasn't able to get get_signer_info handler")?;
+                .context("wasn't able to get ctx_get_signer_info handler")?;
 
-            ctx_get_signer_info(
+            let _ctx_create_empty_sign = (*G_P_IFACE)
+                .CtxCreateEmptySign
+                .context("wasn't able to get ctx_create_empty_sign handler")?;
+
+            // let ctx_create_empty_sign = (*G_P_IFACE)
+            //     .CtxGetSigner
+            //     .context("wasn't able to get ctx_create_empty_sign handler")?;
+
+            let error_code = ctx_get_signer_info(
                 state.ctx.lib_ctx as *mut std::ffi::c_void,
                 signature_idx,
                 signature.as_mut_ptr(),
@@ -153,6 +162,10 @@ pub async fn handler(
                 &mut cert,
                 cert_size,
             );
+
+            if error_code as u32 != EU_ERROR_NONE {
+                return Err(EUSignError(error_code).into());
+            }
         }
 
         // TODO
