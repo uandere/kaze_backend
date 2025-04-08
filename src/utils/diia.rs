@@ -1,4 +1,6 @@
-use anyhow::anyhow;
+use std::{ptr::null_mut, sync::Arc};
+
+use anyhow::{anyhow, Context};
 use http::{
     header::{ACCEPT, AUTHORIZATION},
     HeaderMap, HeaderValue,
@@ -6,7 +8,12 @@ use http::{
 use serde::Deserialize;
 use tracing::error;
 
-use super::server_error::ServerError;
+use super::{
+    cache::AgreementProposalKey,
+    eusign::{EU_ERROR_NONE, G_P_IFACE},
+    s3::get_agreement_pdf,
+    server_error::{EUSignError, ServerError},
+};
 use crate::commands::server::ServerState;
 
 #[derive(Deserialize)]
@@ -54,4 +61,83 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
     *lock = body.token;
 
     Ok(())
+}
+
+/// Adds two CAdeS signatures and stores the signed file on S3.
+pub async fn diia_signature_handler(
+    state: ServerState,
+    tenant_id: String,
+    landlord_id: String,
+) -> Result<(), ServerError> {
+    let _pdf = get_agreement_pdf(
+        &state,
+        Arc::new(AgreementProposalKey {
+            tenant_id: tenant_id.clone(),
+            landlord_id: landlord_id.clone(),
+        }),
+    )
+    .await?;
+
+    let cache_entry = state
+        .cache
+        .get(&AgreementProposalKey {
+            tenant_id: tenant_id.clone(),
+            landlord_id: landlord_id.clone(),
+        })
+        .await
+        .ok_or(anyhow!("cannot sign: agreement doesn't exist"))?;
+
+    // if other party already signed, incrementing index
+    let signature_idx = if cache_entry.landlord_signed || cache_entry.tenant_signed {
+        1_u64
+    } else {
+        0
+    };
+
+    let mut signature = "".to_owned();
+    let mut cert_info = null_mut();
+    let mut cert = null_mut();
+    let cert_size = null_mut();
+
+    unsafe {
+        let ctx_get_signer_info = (*G_P_IFACE)
+            .CtxGetSignerInfo
+            .context("wasn't able to get ctx_get_signer_info handler")?;
+
+        let _ctx_create_empty_sign = (*G_P_IFACE)
+            .CtxCreateEmptySign
+            .context("wasn't able to get ctx_create_empty_sign handler")?;
+
+        let _get_signer = (*G_P_IFACE)
+            .GetSigner
+            .context("wasn't able to get get_signer handler")?;
+
+        let _get_signs_count = (*G_P_IFACE)
+            .GetSignsCount
+            .context("wasn't able to get get_signs_count handler")?;
+
+        let _get_sign_type = (*G_P_IFACE)
+            .GetSignType
+            .context("wasn't able to get get_sign_type handler")?;
+
+        let _append_validators_data_to_signer_ex = (*G_P_IFACE)
+            .AppendValidationDataToSignerEx
+            .context("wasn't able to get get_sign_type handler")?;
+
+        let error_code = ctx_get_signer_info(
+            state.ctx.lib_ctx as *mut std::ffi::c_void,
+            signature_idx,
+            signature.as_mut_ptr(),
+            signature.len().try_into()?,
+            &mut cert_info,
+            &mut cert,
+            cert_size,
+        );
+
+        if error_code as u32 != EU_ERROR_NONE {
+            return Err(EUSignError(error_code).into());
+        }
+
+        Ok(())
+    }
 }

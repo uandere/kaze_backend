@@ -41,7 +41,7 @@ pub struct Payload {
     pub ownership_data: OwneshipData,
 
     /// This is a backdoor for testing purposes
-    pub _uid: String,
+    pub _uid: Option<String>,
 }
 
 /// Generates rental ageement between tenant and landlord.
@@ -50,9 +50,13 @@ pub async fn handler(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,
 ) -> Result<(), ServerError> {
-    // let token = bearer.token();
-    // let uid = verify_jwt(token, &state).await?;
-    let uid = payload._uid;
+    let uid = if let Some(_uid) = payload._uid {
+        _uid
+    } else {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
     if !(uid == payload.landlord_id || uid == payload.tenant_id) {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"

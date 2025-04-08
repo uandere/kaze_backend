@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use axum::{extract::State, response::Response, Json};
 use http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
-use tracing::info;
 use typst_pdf::PdfOptions;
 
 use crate::{

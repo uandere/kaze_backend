@@ -78,23 +78,7 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
         let pool = pool.clone();
 
         async move {
-        // Check if agreement already exists
-        let existing = db::get_agreement(
-            &pool,
-            &key.tenant_id,
-            &key.landlord_id,
-            &Utc::now().date_naive(),
-        )
-        .await;
-
-        let res = match existing {
-            Ok(Some(_)) => {
-                // Agreement already exists, no need to create again
-                warn!("Agreement already exists in database, skipping insert");
-                Ok(())
-            }
-            _ => {
-                // Create new agreement
+        let res = 
                 db::create_agreement(
                     &pool,
                     &db::Agreement {
@@ -103,9 +87,7 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
                         date: Utc::now().date_naive(),
                     },
                 )
-                .await
-            }
-        };
+                .await;
 
         match res {
             Ok(_) => info!("agreement proposal with key = {:?} is removed from cache: both parties agreed and signed", key),

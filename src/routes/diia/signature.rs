@@ -1,19 +1,17 @@
-use std::{ptr::null_mut, str::from_utf8, sync::Arc};
+use std::{str::from_utf8, sync::Arc};
 
 use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
     utils::{
-        cache::AgreementProposalKey,
-        eusign::{EU_ERROR_NONE, G_P_IFACE},
-        s3::get_agreement_pdf,
-        server_error::{EUSignError, ServerError},
+        cache::{AgreementProposalKey, AgreementProposalValue}, db, server_error::ServerError
     },
 };
 use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use http::HeaderMap;
+use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -38,23 +36,16 @@ pub struct SignedHash {
 /// This route handles signed hashes of the agreement that come from Diia Signature.
 ///
 /// For now, the pipeline of handling the data is:
-/// 1. Decrypting the hash using EUSignCP library.
-/// 2. Getting corresponding agreement PDF from AWS S3.
-/// 3. Adding signature to the file.
-/// 4. Updating S3 entry.
-/// 5. Updating the cache (changing tenant_signed or landlord_singed)
+/// 1. Getting the signature from the request
+/// 2. Adding signature to signatures DB
+/// 3. Updating the cache.
 pub async fn handler(
     State(state): State<ServerState>,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
-    // TODO
-    // 1. Decrypting the hash using EUSignCP library.
-
-    info!("Here 1!");
-
+    // 1. Decoding the message
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
-        info!("Here 2!");
         let name = field.name().unwrap_or("<unnamed>").to_string();
 
         let file_name = field
@@ -63,8 +54,6 @@ pub async fn handler(
             .unwrap_or_else(|| format!("{}.txt", name));
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
-
-        info!("Here 3!");
 
         info!("Field Name: {}", name);
         info!("File Name: {}", file_name);
@@ -76,25 +65,18 @@ pub async fn handler(
             &value[..std::cmp::min(value.len(), 50)]
         );
 
-        info!("Here 4!");
-
         if name != "encodeData" {
             continue;
         }
 
-        // 2) DECODE THE DATA FROM BASE64
         let result = BASE64_STANDARD.decode(value)?;
         let result = from_utf8(&result)?;
         let mut result: SignedHash = serde_json::from_str(result)?;
 
-        info!("Here 5!");
-
-        info!("The result of the decoding: {:?}", result);
-
-        // 2. Getting corresponding agreement PDF from AWS S3.
         let SignHashRequestId {
             tenant_id,
             landlord_id,
+            signed_by,
             ..
         } = serde_json::from_str(
             headers
@@ -103,132 +85,52 @@ pub async fn handler(
                 .to_str()?,
         )?;
 
-        let _pdf = get_agreement_pdf(
-            &state,
-            Arc::new(AgreementProposalKey {
-                tenant_id: tenant_id.clone(),
-                landlord_id: landlord_id.clone(),
-            }),
-        )
-        .await?;
+        let signature = result.signed_items.pop().context("cannot extract signature")?.signature;
 
-        let cache_entry = state
+        // TODO
+        // 2. Updating signatures DB
+        db::add_signature(&state.db_pool, &tenant_id, &landlord_id, &signed_by, signature).await?;
+
+        // 3. Updating the cache (changing tenant_signed or landlord_singed)
+        state
             .cache
-            .get(&AgreementProposalKey {
+            .entry(AgreementProposalKey {
                 tenant_id: tenant_id.clone(),
-                landlord_id: landlord_id.clone(),
+                landlord_id: tenant_id.clone(),
             })
-            .await
-            .ok_or(anyhow!("cannot sign: agreement doesn't exist"))?;
+            .and_compute_with(|entry| {
+                let op = match entry {
+                    Some(entry) => {
+                        if signed_by == tenant_id {
+                            Op::Put(Arc::new(AgreementProposalValue {
+                                tenant_signed: true,
+                                ..*entry.into_value().as_ref()
+                            }))
+                        } else {
+                            Op::Put(Arc::new(AgreementProposalValue {
+                                landlord_signed: true,
+                                ..*entry.into_value().as_ref()
+                            }))
+                        }
+                    }
+                    None => {
+                        if signed_by == tenant_id {
+                            Op::Put(Arc::new(AgreementProposalValue {
+                                tenant_signed: true,
+                                ..Default::default()
+                            }))
+                        } else {
+                            Op::Put(Arc::new(AgreementProposalValue {
+                                landlord_signed: true,
+                                ..Default::default()
+                            }))
+                        }
+                    }
+                };
 
-        // if other party already signed, incrementing index
-        let signature_idx = if cache_entry.landlord_signed || cache_entry.tenant_signed {
-            1_u64
-        } else {
-            0
-        };
-
-        let signature = unsafe {
-            result
-                .signed_items
-                .first_mut()
-                .context("signatory didn't sign any file")?
-                .signature
-                .as_bytes_mut()
-        };
-        let mut cert_info = null_mut();
-        let mut cert = null_mut();
-        let cert_size = null_mut();
-
-        unsafe {
-            let ctx_get_signer_info = (*G_P_IFACE)
-                .CtxGetSignerInfo
-                .context("wasn't able to get ctx_get_signer_info handler")?;
-
-            let _ctx_create_empty_sign = (*G_P_IFACE)
-                .CtxCreateEmptySign
-                .context("wasn't able to get ctx_create_empty_sign handler")?;
-
-            // let ctx_create_empty_sign = (*G_P_IFACE)
-            //     .CtxGetSigner
-            //     .context("wasn't able to get ctx_create_empty_sign handler")?;
-
-            let error_code = ctx_get_signer_info(
-                state.ctx.lib_ctx as *mut std::ffi::c_void,
-                signature_idx,
-                signature.as_mut_ptr(),
-                signature.len().try_into()?,
-                &mut cert_info,
-                &mut cert,
-                cert_size,
-            );
-
-            if error_code as u32 != EU_ERROR_NONE {
-                return Err(EUSignError(error_code).into());
-            }
-        }
-
-        // TODO
-        // 3. Adding signature to the file.
-
-        // TODO
-        // 4. Updating S3 entry.
-
-        // TODO
-        // 5. Updating the cache (changing tenant_signed or landlord_singed)
-
-        // let request_id = SignHashRequestId {
-        //     tenant_id: "1".into(),
-        //     landlord_id: "2".into(),
-        //     signed_by: "1".into(),
-        //     seed: uuid::uuid!("12345678-1234-5678-1234-567812345678"),
-        // };
-        // let request_id = serde_json::to_string(&request_id)?;
-        // let SignHashRequestId {
-        //     tenant_id,
-        //     landlord_id: _,
-        //     signed_by,
-        //     ..
-        // } = serde_json::from_str(&request_id)?;
-
-        // state
-        //     .cache
-        //     .entry(AgreementProposalKey {
-        //         tenant_id: tenant_id.clone(),
-        //         landlord_id: tenant_id.clone(),
-        //     })
-        //     .and_compute_with(|entry| {
-        //         let op = match entry {
-        //             Some(entry) => {
-        //                 if signed_by == tenant_id {
-        //                     Op::Put(Arc::new(AgreementProposalValue {
-        //                         tenant_signed: true,
-        //                         ..*entry.into_value().as_ref()
-        //                     }))
-        //                 } else {
-        //                     Op::Put(Arc::new(AgreementProposalValue {
-        //                         landlord_signed: true,
-        //                         ..*entry.into_value().as_ref()
-        //                     }))
-        //                 }
-        //             }
-        //             None => {
-        //                 if signed_by == tenant_id {
-        //                     Op::Put(Arc::new(AgreementProposalValue {
-        //                         tenant_signed: true,
-        //                         ..Default::default()
-        //                     }))
-        //                 } else {
-        //                     Op::Put(Arc::new(AgreementProposalValue {
-        //                         landlord_signed: true,
-        //                         ..Default::default()
-        //                     }))
-        //                 }
-        //             },
-        //         };
-
-        //         std::future::ready(op)
-        //     }).await;
+                std::future::ready(op)
+            })
+            .await;
     }
 
     Ok(Json(Response { success: true }))

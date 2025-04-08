@@ -92,6 +92,22 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
     .await
     .context("Failed to create agreements table")?;
 
+    // TODO: add housing_id for correct handling of different objects between same parties
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS signatures (
+            tenant_id TEXT NOT NULL,
+            landlord_id TEXT NOT NULL,
+            tenant_signature TEXT,
+            landlord_signature TEXT,
+            PRIMARY KEY (tenant_id, landlord_id)
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("Failed to create signatures table")?;
+
     Ok(())
 }
 
@@ -258,7 +274,7 @@ pub async fn get_agreements_for_landlord(
 ) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
-        SELECT 
+        INSERT INTO 
             tenant_id, 
             landlord_id, 
             date
@@ -339,5 +355,100 @@ pub async fn delete_agreement(
     .await
     .context("Failed to delete agreement")?;
 
+    Ok(result.rows_affected() > 0)
+}
+
+/// Create a signature entry for the specific agreement.
+pub async fn create_signature_entry(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+) -> Result<bool, ServerError> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO signatures (
+            tenant_id, 
+            landlord_id,
+            tenant_signature,
+            landlord_signature,
+        )
+        VALUES ($1, $2, "", "")
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .execute(pool)
+    .await
+    .context("Failed to create signature entry")?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+/// Add a signature to the signature entry.
+pub async fn add_signature(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+    signed_by: &str,
+    signature: String,
+) -> Result<bool, ServerError> {
+    // Figure out which column to set
+    let col_to_set = if signed_by == tenant_id {
+        "tenant_signature"
+    } else {
+        "landlord_signature"
+    };
+
+    let query = format!(
+        r#"
+        INSERT INTO signatures (tenant_id, landlord_id, tenant_signature, landlord_signature)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (tenant_id, landlord_id)
+        DO UPDATE SET {0} = EXCLUDED.{0}
+        "#,
+        col_to_set
+    );
+
+    let (tenant_sig, landlord_sig) = if col_to_set == "tenant_signature" {
+        (signature, "".to_string())
+    } else {
+        ("".to_string(), signature)
+    };
+
+    let result = sqlx::query(&query)
+        .bind(tenant_id)
+        .bind(landlord_id)
+        .bind(tenant_sig)
+        .bind(landlord_sig)
+        .execute(pool)
+        .await
+        .context("Failed to upsert signature")?;
+
+    // rows_affected() should be 1 for either the insert or the update.
+    // If it returns 0, then no row was changed at all.
+    Ok(result.rows_affected() > 0)
+}
+
+
+/// Remove a signature entry completely.
+pub async fn remove_signature_entry(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+) -> Result<bool, ServerError> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM signatures
+        WHERE tenant_id = $1
+          AND landlord_id = $2
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .execute(pool)
+    .await
+    .context("Failed to remove signature entry")?;
+
+    // Returns `true` if at least one row was deleted.
     Ok(result.rows_affected() > 0)
 }
