@@ -359,10 +359,10 @@ pub async fn delete_agreement(
 }
 
 pub struct SignatureEntry {
-    pub tenant_id: String, 
+    pub tenant_id: String,
     pub landlord_id: String,
     pub tenant_signature: String,
-    pub landlord_signature: String, 
+    pub landlord_signature: String,
 }
 
 /// Create a signature entry for the specific agreement.
@@ -436,13 +436,28 @@ pub async fn add_signature(
     Ok(result.rows_affected() > 0)
 }
 
-
-/// Remove a signature entry completely.
+/// Remove a signature entry completely and return the deleted entry if found.
 pub async fn remove_signature_entry(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
-) -> Result<bool, ServerError> {
+) -> Result<Option<SignatureEntry>, ServerError> {
+    // First, retrieve the signature entry that's about to be deleted
+    let signature_entry = sqlx::query_as::<_, (String, String, String, String)>(
+        r#"
+        SELECT tenant_id, landlord_id, tenant_signature, landlord_signature
+        FROM signatures
+        WHERE tenant_id = $1
+          AND landlord_id = $2
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .fetch_optional(pool)
+    .await
+    .context("Failed to fetch signature entry before removal")?;
+
+    // Now delete the entry
     let result = sqlx::query(
         r#"
         DELETE FROM signatures
@@ -456,6 +471,20 @@ pub async fn remove_signature_entry(
     .await
     .context("Failed to remove signature entry")?;
 
-    // Returns `true` if at least one row was deleted.
-    Ok(result.rows_affected() > 0)
+    // If we found and deleted an entry, convert it to a SignatureEntry struct
+    if result.rows_affected() > 0 {
+        if let Some((tenant_id, landlord_id, tenant_signature, landlord_signature)) =
+            signature_entry
+        {
+            return Ok(Some(SignatureEntry {
+                tenant_id,
+                landlord_id,
+                tenant_signature,
+                landlord_signature,
+            }));
+        }
+    }
+
+    // No rows were deleted
+    Ok(None)
 }

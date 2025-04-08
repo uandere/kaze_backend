@@ -11,10 +11,14 @@ use serde::{Deserialize, Serialize};
 use tokio::{
     fs,
     io::{AsyncReadExt, AsyncWriteExt},
+    sync::mpsc::UnboundedSender,
 };
 use tracing::*;
 
-use super::{db, server_error::ServerError};
+use super::{
+    db::{self, SignatureEntry},
+    server_error::ServerError,
+};
 
 pub const CACHE_SAVE_LOCATION_DEFAULT: &str = "checkpoint/cache.json";
 
@@ -67,7 +71,10 @@ impl Expiry<AgreementProposalKey, Arc<AgreementProposalValue>> for AgreedAndSign
     }
 }
 
-pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
+pub fn build_cache(
+    pool: Arc<db::DbPool>,
+    sender: UnboundedSender<SignatureEntry>,
+) -> AgreementProposalCache {
     let expiry = AgreedAndSignedExpiry;
 
     // In this function we move the entry to the permanent database.
@@ -76,10 +83,10 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
                                   _c|
           -> ListenerFuture {
         let pool = pool.clone();
+        let sender = sender.clone();
 
-    async move {
-        let res = 
-                db::create_agreement(
+        async move {
+        let res = db::create_agreement(
                     &pool,
                     &db::Agreement {
                         tenant_id: key.tenant_id.clone(),
@@ -95,7 +102,23 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
         }
 
         // extracting signatures and sending them to signature handler 
-        let res = todo!();
+        match db::remove_signature_entry(&pool, &key.tenant_id, &key.landlord_id).await {
+            Ok(maybe_entry) => {
+                match maybe_entry {
+                    Some(entry) => {
+                        if let Err(e) = sender.send(entry) {
+                            error!("the signature request wasn't fulfilled: couldn't send the signature entry to signature handler: {}", e);
+                        }
+                    },
+                    None => {
+                        error!("the signature request wasn't fulfilled: no such signature entry in the db");
+                    },
+                }
+            },
+            Err(e) => {
+                error!("the signature request wasn't fulfilled: couldn't get signatures from the db: {:?}", e);
+            },
+        }
 
     }
     .boxed()

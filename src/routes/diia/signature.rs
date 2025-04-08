@@ -4,7 +4,9 @@ use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
     utils::{
-        cache::{AgreementProposalKey, AgreementProposalValue}, db, server_error::ServerError
+        cache::{AgreementProposalKey, AgreementProposalValue},
+        db,
+        server_error::ServerError,
     },
 };
 use anyhow::{anyhow, Context};
@@ -85,11 +87,22 @@ pub async fn handler(
                 .to_str()?,
         )?;
 
-        let signature = result.signed_items.pop().context("cannot extract signature")?.signature;
+        let signature = result
+            .signed_items
+            .pop()
+            .context("cannot extract signature")?
+            .signature;
 
         // TODO
         // 2. Updating signatures DB
-        db::add_signature(&state.db_pool, &tenant_id, &landlord_id, &signed_by, signature).await?;
+        db::add_signature(
+            &state.db_pool,
+            &tenant_id,
+            &landlord_id,
+            &signed_by,
+            signature,
+        )
+        .await?;
 
         // 3. Updating the cache (changing tenant_signed or landlord_singed)
         state

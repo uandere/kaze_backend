@@ -17,7 +17,6 @@ use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::UnboundedSender;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, c_ulong, c_void, CString};
 use std::net::{SocketAddr, TcpListener};
@@ -32,7 +31,6 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
 use super::utils::cache::AgreementProposalCache;
-use super::utils::db::SignatureEntry;
 use super::utils::server_error::ServerError;
 
 /// Database configuration from the AWS Secret
@@ -113,8 +111,11 @@ pub fn run(
 
         let config = Config::new(&config_path);
 
+        let (signature_request_sender, mut signature_request_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+
         // We'll keep the cache for compatibility, but gradually transition to DB
-        let cache = build_cache(Arc::new(db_pool.clone()));
+        let cache = build_cache(Arc::new(db_pool.clone()), signature_request_sender);
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
 
         // cache keeper task to trigger cache updates once in a while
@@ -194,8 +195,6 @@ pub fn run(
                 .expect("cannot receive google live token verifier"),
         );
 
-        let (signature_request_sender, mut signature_request_receiver) = tokio::sync::mpsc::unbounded_channel();
-
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
@@ -209,7 +208,6 @@ pub fn run(
             aws_s3_client,
             s3_bucket_name,
             diia_session_token: Arc::new(Mutex::new("".into())),
-            signature_request_sender,
         };
 
         // Setting up cache renewal for Diia once per every ~two hours
@@ -233,7 +231,9 @@ pub fn run(
         tokio::spawn(async move {
             loop {
                 if let Some(signature_entry) = signature_request_receiver.recv().await {
-                    if let Err(e) = diia_signature_handler(cloned_server_state.clone(), signature_entry).await {
+                    if let Err(e) =
+                        diia_signature_handler(cloned_server_state.clone(), signature_entry).await
+                    {
                         error!("couldn't handle signature reqeust: {:?}", e);
                     }
                 }
@@ -324,8 +324,6 @@ pub struct ServerState {
     pub s3_bucket_name: String,
     /// Diia session token
     pub diia_session_token: Arc<Mutex<String>>,
-    /// The handle to send signature requests
-    pub signature_request_sender: UnboundedSender<SignatureEntry>,
 }
 
 #[derive(Parser, Clone)]
