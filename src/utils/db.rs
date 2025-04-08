@@ -358,6 +358,13 @@ pub async fn delete_agreement(
     Ok(result.rows_affected() > 0)
 }
 
+pub struct SignatureEntry {
+    pub tenant_id: String, 
+    pub landlord_id: String,
+    pub tenant_signature: String,
+    pub landlord_signature: String, 
+}
+
 /// Create a signature entry for the specific agreement.
 pub async fn create_signature_entry(
     pool: &DbPool,

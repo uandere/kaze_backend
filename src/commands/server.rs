@@ -1,7 +1,7 @@
 use crate::utils::cache::{build_cache, populate_cache_from_file, CACHE_SAVE_LOCATION_DEFAULT};
 use crate::utils::config::Config;
 use crate::utils::db::{init_db_pool, setup_db, DbPool};
-use crate::utils::diia::refresh_diia_session_token;
+use crate::utils::diia::{diia_signature_handler, refresh_diia_session_token};
 use crate::utils::eusign::*;
 use crate::utils::secrets::get_secret;
 use crate::utils::server_error::EUSignError;
@@ -17,6 +17,7 @@ use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::UnboundedSender;
 use std::collections::BTreeMap;
 use std::ffi::{c_char, c_ulong, c_void, CString};
 use std::net::{SocketAddr, TcpListener};
@@ -31,6 +32,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
 use super::utils::cache::AgreementProposalCache;
+use super::utils::db::SignatureEntry;
 use super::utils::server_error::ServerError;
 
 /// Database configuration from the AWS Secret
@@ -192,6 +194,8 @@ pub fn run(
                 .expect("cannot receive google live token verifier"),
         );
 
+        let (signature_request_sender, mut signature_request_receiver) = tokio::sync::mpsc::unbounded_channel();
+
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
@@ -205,6 +209,7 @@ pub fn run(
             aws_s3_client,
             s3_bucket_name,
             diia_session_token: Arc::new(Mutex::new("".into())),
+            signature_request_sender,
         };
 
         // Setting up cache renewal for Diia once per every ~two hours
@@ -220,6 +225,18 @@ pub fn run(
                     info!("successfully refreshed Diia session token");
                 }
                 sleep(duration).await;
+            }
+        });
+
+        // Setting up signature request handler
+        let cloned_server_state = server_state.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Some(signature_entry) = signature_request_receiver.recv().await {
+                    if let Err(e) = diia_signature_handler(cloned_server_state.clone(), signature_entry).await {
+                        error!("couldn't handle signature reqeust: {:?}", e);
+                    }
+                }
             }
         });
 
@@ -307,6 +324,8 @@ pub struct ServerState {
     pub s3_bucket_name: String,
     /// Diia session token
     pub diia_session_token: Arc<Mutex<String>>,
+    /// The handle to send signature requests
+    pub signature_request_sender: UnboundedSender<SignatureEntry>,
 }
 
 #[derive(Parser, Clone)]

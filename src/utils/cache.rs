@@ -77,7 +77,7 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
           -> ListenerFuture {
         let pool = pool.clone();
 
-        async move {
+    async move {
         let res = 
                 db::create_agreement(
                     &pool,
@@ -93,6 +93,10 @@ pub fn build_cache(pool: Arc<db::DbPool>) -> AgreementProposalCache {
             Ok(_) => info!("agreement proposal with key = {:?} is removed from cache: both parties agreed and signed", key),
             Err(e) => error!("agreement proposal with key = {:?} is removed from cache, but was not added to database: {:?}", key, e),
         }
+
+        // extracting signatures and sending them to signature handler 
+        let res = todo!();
+
     }
     .boxed()
     };

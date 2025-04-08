@@ -10,6 +10,7 @@ use tracing::error;
 
 use super::{
     cache::AgreementProposalKey,
+    db::SignatureEntry,
     eusign::{EU_ERROR_NONE, G_P_IFACE},
     s3::get_agreement_pdf,
     server_error::{EUSignError, ServerError},
@@ -66,8 +67,12 @@ pub async fn refresh_diia_session_token(state: ServerState) -> Result<(), Server
 /// Adds two CAdeS signatures and stores the signed file on S3.
 pub async fn diia_signature_handler(
     state: ServerState,
-    tenant_id: String,
-    landlord_id: String,
+    SignatureEntry {
+        tenant_id,
+        landlord_id,
+        tenant_signature,
+        landlord_signature,
+    }: SignatureEntry,
 ) -> Result<(), ServerError> {
     let _pdf = get_agreement_pdf(
         &state,
