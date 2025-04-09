@@ -27,6 +27,7 @@ use tokio::fs::read_to_string;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use tokio_util::task::LocalPoolHandle;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 
@@ -227,8 +228,9 @@ pub fn run(
         });
 
         // Setting up signature request handler
+        let pool = LocalPoolHandle::new(4);
         let cloned_server_state = server_state.clone();
-        tokio::spawn(async move {
+        pool.spawn_pinned(|| async move {
             loop {
                 if let Some(signature_entry) = signature_request_receiver.recv().await {
                     if let Err(e) =

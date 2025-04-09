@@ -5,7 +5,7 @@ use anyhow::anyhow;
 
 use super::{cache::AgreementProposalKey, server_error::ServerError};
 
-// Function to upload data to S3
+// Uploads agreement PDF to S3
 pub async fn upload_agreement_pdf(
     state: &ServerState,
     body: Vec<u8>,
@@ -25,8 +25,32 @@ pub async fn upload_agreement_pdf(
         .map_err(ServerError::from)
 }
 
-fn get_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
+// Uploads a signed agreement to S3
+pub async fn upload_agreement_p7s(
+    state: &ServerState,
+    body: Vec<u8>,
+    agreement_proposal_key: Arc<AgreementProposalKey>,
+) -> Result<aws_sdk_s3::operation::put_object::PutObjectOutput, ServerError> {
+    let key = get_signature_key_for_s3(agreement_proposal_key);
+    let body = aws_sdk_s3::primitives::ByteStream::from(body);
+    state
+        .aws_s3_client
+        .put_object()
+        .bucket(&state.s3_bucket_name)
+        .key(key)
+        .body(body)
+        .content_type("application/pkcs7-signature") // Add this line
+        .send()
+        .await
+        .map_err(ServerError::from)
+}
+
+pub fn get_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
     key.tenant_id.clone() + "_" + &key.landlord_id
+}
+
+pub fn get_signature_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
+    "signature".to_owned() + "_" + &key.tenant_id + "_" + &key.landlord_id
 }
 
 pub async fn get_agreement_pdf(

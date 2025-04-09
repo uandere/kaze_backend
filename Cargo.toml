@@ -40,6 +40,7 @@ aws-sdk-s3 = "1.81.0"
 rustls = { version = "0.23.25", features = ["ring"] }
 uuid = { version = "1.16.0", features = ["v4", "serde"] }
 deranged = "=0.4.0"
+tokio-util = { version = "0.7.14", features = ["full", "tracing"] }
 
 
 [build-dependencies]
