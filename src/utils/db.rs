@@ -191,6 +191,7 @@ pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<()
             date
         )
         VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
         "#,
     )
     .bind(&agreement.tenant_id)
@@ -202,6 +203,7 @@ pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<()
 
     Ok(())
 }
+
 
 /// Retrieve a specific agreement from the database
 pub async fn get_agreement(

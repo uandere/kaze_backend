@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use chrono::Utc;
 use moka::{
     future::{Cache, FutureExt},
-    notification::ListenerFuture,
+    notification::{ListenerFuture, RemovalCause},
     Expiry,
 };
 use serde::{Deserialize, Serialize};
@@ -80,8 +80,12 @@ pub fn build_cache(
     // In this function we move the entry to the permanent database.
     let eviction_listener = move |key: Arc<AgreementProposalKey>,
                                   _val: Arc<AgreementProposalValue>,
-                                  _c|
+                                  cause|
           -> ListenerFuture {
+
+        if cause != RemovalCause::Expired {
+            return (async {}).boxed();
+        }
         let pool = pool.clone();
         let sender = sender.clone();
 

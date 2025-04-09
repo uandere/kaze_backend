@@ -13,6 +13,7 @@ use http::{
     HeaderMap, HeaderValue,
 };
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -90,12 +91,14 @@ pub async fn handler(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
+    info!("Here1");
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
         let token = bearer.token();
         verify_jwt(token, &state).await?
     };
+    info!("Here2");
 
     if !(uid == payload.landlord_id || uid == payload.tenant_id) {
         return Err(anyhow!(
@@ -113,6 +116,7 @@ pub async fn handler(
         }),
     )
     .await?;
+info!("Here3");
 
     // generating the hash
     let hash_string;
