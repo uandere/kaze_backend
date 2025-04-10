@@ -53,6 +53,7 @@ pub fn get_signature_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
     "signature".to_owned() + "_" + &key.tenant_id + "_" + &key.landlord_id
 }
 
+// Returns a PDF from the S3 bucket
 pub async fn get_agreement_pdf(
     state: &ServerState,
     agreement_proposal_key: Arc<AgreementProposalKey>,

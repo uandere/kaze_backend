@@ -125,13 +125,11 @@ pub async fn handler(
 
     // Trying to get data from the database
     let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
-        .await
-        .ok_or(anyhow!("cannot get tenant data from db"))?;
+        .await?;
 
     // Similarly for landlord data
     let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
-        .await
-        .ok_or(anyhow!("cannot get tenant data from db"))?;
+        .await?;
 
     let typst_code = generate(
         &state,

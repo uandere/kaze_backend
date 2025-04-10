@@ -145,21 +145,21 @@ pub async fn store_document_unit(
 }
 
 /// Retrieve document unit from the database
-pub async fn get_document_unit_from_db(pool: &DbPool, user_id: &str) -> Option<Arc<DocumentUnit>> {
+pub async fn get_document_unit_from_db(pool: &DbPool, user_id: &str) -> Result<Arc<DocumentUnit>, ServerError> {
     let record = sqlx::query(
         "SELECT taxpayer_card, internal_passport FROM document_units WHERE user_id = $1",
     )
     .bind(user_id)
     .fetch_optional(pool)
-    .await
-    .ok()?;
+    .await?;
 
-    record.map(|record| {
-        Arc::new(DocumentUnit {
-            taxpayer_card: record.get("taxpayer_card"),
-            internal_passport: record.get("internal_passport"),
-        })
-    })
+    match record {
+        Some(record) => Ok(Arc::new(DocumentUnit {
+            taxpayer_card: record.try_get("taxpayer_card")?,
+            internal_passport: record.try_get("internal_passport")?,
+        })),
+        None => Err(anyhow!("no such entry in the db").into()),
+    }
 }
 
 /// Delete a document unit from the database
@@ -203,7 +203,6 @@ pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<()
 
     Ok(())
 }
-
 
 /// Retrieve a specific agreement from the database
 pub async fn get_agreement(

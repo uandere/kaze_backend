@@ -116,7 +116,7 @@ pub async fn handler(
         }),
     )
     .await?;
-info!("Here3");
+    info!("Here3");
 
     // generating the hash
     let hash_string;
