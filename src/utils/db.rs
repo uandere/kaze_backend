@@ -117,6 +117,8 @@ pub async fn store_document_unit(
     user_id: &str,
     unit: &DocumentUnit,
 ) -> Result<(), ServerError> {
+    let user_id = "\"".to_owned() + user_id + "\"";
+
     let taxpayer_json =
         serde_json::to_value(&unit.taxpayer_card).context("Failed to serialize taxpayer card")?;
 
@@ -164,7 +166,6 @@ pub async fn get_document_unit_from_db(pool: &DbPool, user_id: &str) -> Result<A
 
 /// Delete a document unit from the database
 pub async fn delete_document_unit(pool: &DbPool, user_id: &str) -> Result<bool, ServerError> {
-    // Using query_as instead of the query! macro to avoid compile-time verification issues
     let result = sqlx::query("DELETE FROM document_units WHERE user_id = $1")
         .bind(user_id)
         .execute(pool)
