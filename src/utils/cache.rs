@@ -82,7 +82,6 @@ pub fn build_cache(
                                   _val: Arc<AgreementProposalValue>,
                                   cause|
           -> ListenerFuture {
-
         if cause != RemovalCause::Expired {
             return (async {}).boxed();
         }

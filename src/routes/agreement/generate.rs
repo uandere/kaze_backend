@@ -64,6 +64,16 @@ pub async fn handler(
         .into());
     }
 
+
+    // Trying to get data from the database
+    let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
+        .await?;
+
+    // Similarly for landlord data
+    let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
+        .await?;
+
+
     info!("Cache before /generate: {:?}", state.cache);
 
     let result = state
@@ -122,14 +132,6 @@ pub async fn handler(
     }
 
     // Here we know for sure that both parties confirmed
-
-    // Trying to get data from the database
-    let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
-        .await?;
-
-    // Similarly for landlord data
-    let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
-        .await?;
 
     let typst_code = generate(
         &state,
