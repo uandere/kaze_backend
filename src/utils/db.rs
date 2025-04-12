@@ -117,8 +117,6 @@ pub async fn store_document_unit(
     user_id: &str,
     unit: &DocumentUnit,
 ) -> Result<(), ServerError> {
-    let user_id = "\"".to_owned() + user_id + "\"";
-
     let taxpayer_json =
         serde_json::to_value(&unit.taxpayer_card).context("Failed to serialize taxpayer card")?;
 
