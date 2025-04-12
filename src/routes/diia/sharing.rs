@@ -63,7 +63,7 @@ pub async fn handler(
 
         // Getting user_id and random seed
         let sharing_request_id: DiiaSharingRequestId = serde_json::from_str(&result.request_id)?;
-        let uid = sharing_request_id.uid;
+        let uid = sharing_request_id.uid.replace("\"", "");
 
         // Getting the actual passport data
         let data = result.data;
