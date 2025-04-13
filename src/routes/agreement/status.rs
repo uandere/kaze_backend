@@ -1,4 +1,4 @@
-use axum::{extract::State, Json};
+use axum::{extract::{Query, State}, Json};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -37,11 +37,11 @@ pub struct Response {
 /// The date field is optional: if not passed, the latest agreement will be considered.
 pub async fn handler(
     State(state): State<ServerState>,
-    Json(Payload {
+    Query(Payload {
         tenant_id,
         landlord_id,
         date,
-    }): Json<Payload>,
+    }): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     let mut status = AgreementStatus::NotInitiated;
 
