@@ -1,11 +1,10 @@
-// src/utils/db.rs
 use anyhow::{anyhow, Context};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
-    Decode, Pool, Postgres, Row,
+    Pool, Postgres, Row,
 };
 use std::sync::Arc;
 
@@ -27,7 +26,6 @@ impl sqlx::Type<Postgres> for TaxpayerCard {
     }
 }
 
-// Do the same for InternalPassport
 impl<'r> sqlx::Decode<'r, Postgres> for InternalPassport {
     fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let json = <sqlx::types::Json<InternalPassport> as sqlx::Decode<Postgres>>::decode(value)?;
@@ -64,6 +62,7 @@ pub async fn init_db_pool(
 
 /// Perform initial database setup - create tables if they don't exist
 pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
+    // Table for DocumentUnits
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS document_units (
@@ -78,6 +77,7 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
     .await
     .context("Failed to create document_units table")?;
 
+    // Table for Agreements
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS agreements (
@@ -93,7 +93,7 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
     .await
     .context("Failed to create agreements table")?;
 
-    // TODO: add housing_id for correct handling of different objects between same parties
+    // Table for Signatures
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS signatures (
@@ -152,33 +152,46 @@ pub async fn get_document_unit_from_db(
     user_id: &str,
 ) -> Result<Arc<DocumentUnit>, ServerError> {
     let record = sqlx::query(
-        "SELECT taxpayer_card, internal_passport FROM document_units WHERE user_id = $1",
+        r#"
+        SELECT taxpayer_card, internal_passport
+        FROM document_units
+        WHERE user_id = $1
+        "#,
     )
     .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
     match record {
-        Some(record) => Ok(Arc::new(DocumentUnit {
-            taxpayer_card: record.try_get("taxpayer_card")?,
-            internal_passport: record.try_get("internal_passport")?,
-        })),
+        Some(row) => {
+            let taxpayer_card: TaxpayerCard = row.try_get("taxpayer_card")?;
+            let internal_passport: InternalPassport = row.try_get("internal_passport")?;
+            Ok(Arc::new(DocumentUnit {
+                taxpayer_card,
+                internal_passport,
+            }))
+        }
         None => Err(anyhow!("no such entry in the db").into()),
     }
 }
 
 /// Delete a document unit from the database
 pub async fn delete_document_unit(pool: &DbPool, user_id: &str) -> Result<bool, ServerError> {
-    let result = sqlx::query("DELETE FROM document_units WHERE user_id = $1")
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .context("Failed to delete document unit")?;
+    let result = sqlx::query(
+        r#"
+        DELETE FROM document_units
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .context("Failed to delete document unit")?;
 
     Ok(result.rows_affected() > 0)
 }
 
-#[derive(Serialize, Deserialize, Decode)]
+#[derive(Serialize, Deserialize)]
 pub struct Agreement {
     pub tenant_id: String,
     pub landlord_id: String,
@@ -192,8 +205,8 @@ pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<()
         r#"
         INSERT INTO agreements (
             tenant_id, 
-            landlord_id,
-            housing_id,
+            landlord_id, 
+            housing_id, 
             date
         )
         VALUES ($1, $2, $3, $4)
@@ -221,13 +234,12 @@ pub async fn get_agreement(
 ) -> Result<Option<Agreement>, ServerError> {
     let record = sqlx::query(
         r#"
-        SELECT 
-            tenant_id,
-            landlord_id,
-            housing_id,
-            date
+        SELECT tenant_id, landlord_id, housing_id, date
         FROM agreements 
-        WHERE tenant_id = $1 AND landlord_id = $2 AND housing_id = $3 AND date = $4
+        WHERE tenant_id = $1
+          AND landlord_id = $2
+          AND housing_id = $3
+          AND date = $4
         "#,
     )
     .bind(tenant_id)
@@ -238,12 +250,21 @@ pub async fn get_agreement(
     .await
     .context("Failed to fetch the agreement")?;
 
-    Ok(record.map(|row| Agreement {
-        tenant_id: row.get("tenant_id"),
-        landlord_id: row.get("landlord_id"),
-        housing_id: row.get("housing_id"),
-        date: row.get("date"),
-    }))
+    if let Some(row) = record {
+        let tenant_id: String = row.try_get("tenant_id")?;
+        let landlord_id: String = row.try_get("landlord_id")?;
+        let housing_id: String = row.try_get("housing_id")?;
+        let date: NaiveDate = row.try_get("date")?;
+
+        Ok(Some(Agreement {
+            tenant_id,
+            landlord_id,
+            housing_id,
+            date,
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Retrieve all agreements for a specific tenant
@@ -253,11 +274,7 @@ pub async fn get_agreements_for_tenant(
 ) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
-        SELECT 
-            tenant_id, 
-            landlord_id,
-            housing_id,
-            date
+        SELECT tenant_id, landlord_id, housing_id, date
         FROM agreements 
         WHERE tenant_id = $1
         ORDER BY date DESC
@@ -268,15 +285,20 @@ pub async fn get_agreements_for_tenant(
     .await
     .context("Failed to fetch tenant agreements")?;
 
-    let agreements = rows
-        .into_iter()
-        .map(|row| Agreement {
-            tenant_id: row.get("tenant_id"),
-            landlord_id: row.get("landlord_id"),
-            housing_id: row.get("housing_id"),
-            date: row.get("date"),
-        })
-        .collect();
+    let mut agreements = Vec::new();
+    for row in rows {
+        let tenant_id: String = row.try_get("tenant_id")?;
+        let landlord_id: String = row.try_get("landlord_id")?;
+        let housing_id: String = row.try_get("housing_id")?;
+        let date: NaiveDate = row.try_get("date")?;
+
+        agreements.push(Agreement {
+            tenant_id,
+            landlord_id,
+            housing_id,
+            date,
+        });
+    }
 
     Ok(agreements)
 }
@@ -288,11 +310,7 @@ pub async fn get_agreements_for_landlord(
 ) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
-        SELECT 
-            tenant_id, 
-            landlord_id,
-            housing_id,
-            date
+        SELECT tenant_id, landlord_id, housing_id, date
         FROM agreements 
         WHERE landlord_id = $1
         ORDER BY date DESC
@@ -303,15 +321,20 @@ pub async fn get_agreements_for_landlord(
     .await
     .context("Failed to fetch landlord agreements")?;
 
-    let agreements = rows
-        .into_iter()
-        .map(|row| Agreement {
-            tenant_id: row.get("tenant_id"),
-            landlord_id: row.get("landlord_id"),
-            housing_id: row.get("housing_id"),
-            date: row.get("date"),
-        })
-        .collect();
+    let mut agreements = Vec::new();
+    for row in rows {
+        let tenant_id: String = row.try_get("tenant_id")?;
+        let landlord_id: String = row.try_get("landlord_id")?;
+        let housing_id: String = row.try_get("housing_id")?;
+        let date: NaiveDate = row.try_get("date")?;
+
+        agreements.push(Agreement {
+            tenant_id,
+            landlord_id,
+            housing_id,
+            date,
+        });
+    }
 
     Ok(agreements)
 }
@@ -323,14 +346,10 @@ pub async fn get_agreements_for_tenant_and_landlord(
 ) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
-        SELECT 
-            tenant_id,
-            landlord_id,
-            housing_id,
-            date
+        SELECT tenant_id, landlord_id, housing_id, date
         FROM agreements
         WHERE tenant_id = $1
-        AND landlord_id = $2
+          AND landlord_id = $2
         ORDER BY date DESC
         "#,
     )
@@ -338,17 +357,22 @@ pub async fn get_agreements_for_tenant_and_landlord(
     .bind(landlord_id)
     .fetch_all(pool)
     .await
-    .context("Failed to fetch tenant agreements")?;
+    .context("Failed to fetch tenant-landlord agreements")?;
 
-    let agreements = rows
-        .into_iter()
-        .map(|row| Agreement {
-            tenant_id: row.get("tenant_id"),
-            landlord_id: row.get("landlord_id"),
-            housing_id: row.get("housing_id"),
-            date: row.get("date"),
-        })
-        .collect();
+    let mut agreements = Vec::new();
+    for row in rows {
+        let tenant_id: String = row.try_get("tenant_id")?;
+        let landlord_id: String = row.try_get("landlord_id")?;
+        let housing_id: String = row.try_get("housing_id")?;
+        let date: NaiveDate = row.try_get("date")?;
+
+        agreements.push(Agreement {
+            tenant_id,
+            landlord_id,
+            housing_id,
+            date,
+        });
+    }
 
     Ok(agreements)
 }
@@ -364,7 +388,10 @@ pub async fn delete_agreement(
     let result = sqlx::query(
         r#"
         DELETE FROM agreements 
-        WHERE tenant_id = $1 AND landlord_id = $2 AND housing_id = $3 AND date = $4
+        WHERE tenant_id = $1
+          AND landlord_id = $2
+          AND housing_id = $3
+          AND date = $4
         "#,
     )
     .bind(tenant_id)
@@ -400,9 +427,9 @@ pub async fn create_signature_entry(
             landlord_id,
             housing_id,
             tenant_signature,
-            landlord_signature,
+            landlord_signature
         )
-        VALUES ($1, $2, $3, "", "")
+        VALUES ($1, $2, $3, '', '')
         "#,
     )
     .bind(tenant_id)
@@ -416,6 +443,7 @@ pub async fn create_signature_entry(
 }
 
 /// Add a signature to the signature entry.
+/// The `signed_by` param decides whether `tenant_signature` or `landlord_signature` is updated.
 pub async fn add_signature(
     pool: &DbPool,
     tenant_id: &str,
@@ -433,7 +461,13 @@ pub async fn add_signature(
 
     let query = format!(
         r#"
-        INSERT INTO signatures (tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature)
+        INSERT INTO signatures (
+            tenant_id, 
+            landlord_id,
+            housing_id,
+            tenant_signature,
+            landlord_signature
+        )
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (tenant_id, landlord_id, housing_id)
         DO UPDATE SET {0} = EXCLUDED.{0}
@@ -457,8 +491,7 @@ pub async fn add_signature(
         .await
         .context("Failed to upsert signature")?;
 
-    // rows_affected() should be 1 for either the insert or the update.
-    // If it returns 0, then no row was changed at all.
+    // rows_affected() should be 1 for either the insert or the update
     Ok(result.rows_affected() > 0)
 }
 
@@ -470,7 +503,7 @@ pub async fn remove_signature_entry(
     housing_id: &str,
 ) -> Result<Option<SignatureEntry>, ServerError> {
     // First, retrieve the signature entry that's about to be deleted
-    let signature_entry = sqlx::query_as::<_, (String, String, String, String, String)>(
+    let signature_entry = sqlx::query(
         r#"
         SELECT tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature
         FROM signatures
@@ -502,11 +535,15 @@ pub async fn remove_signature_entry(
     .await
     .context("Failed to remove signature entry")?;
 
-    // If we found and deleted an entry, convert it to a SignatureEntry struct
     if result.rows_affected() > 0 {
-        if let Some((tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature)) =
-            signature_entry
-        {
+        // We did delete something
+        if let Some(row) = signature_entry {
+            let tenant_id: String = row.try_get("tenant_id")?;
+            let landlord_id: String = row.try_get("landlord_id")?;
+            let housing_id: String = row.try_get("housing_id")?;
+            let tenant_signature: String = row.try_get("tenant_signature")?;
+            let landlord_signature: String = row.try_get("landlord_signature")?;
+
             return Ok(Some(SignatureEntry {
                 tenant_id,
                 landlord_id,
@@ -517,6 +554,6 @@ pub async fn remove_signature_entry(
         }
     }
 
-    // No rows were deleted
+    // No rows deleted or no entry was found
     Ok(None)
 }
