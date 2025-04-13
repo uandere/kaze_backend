@@ -83,8 +83,9 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
         CREATE TABLE IF NOT EXISTS agreements (
             tenant_id TEXT NOT NULL,
             landlord_id TEXT NOT NULL,
+            housing_id TEXT NOT NULL,
             date DATE NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (tenant_id, landlord_id, date)
+            PRIMARY KEY (tenant_id, landlord_id, housing_id, date)
         )
         "#,
     )
@@ -98,9 +99,10 @@ pub async fn setup_db(pool: &DbPool) -> Result<(), ServerError> {
         CREATE TABLE IF NOT EXISTS signatures (
             tenant_id TEXT NOT NULL,
             landlord_id TEXT NOT NULL,
+            housing_id TEXT NOT NULL,
             tenant_signature TEXT,
             landlord_signature TEXT,
-            PRIMARY KEY (tenant_id, landlord_id)
+            PRIMARY KEY (tenant_id, landlord_id, housing_id)
         )
         "#,
     )
@@ -145,7 +147,10 @@ pub async fn store_document_unit(
 }
 
 /// Retrieve document unit from the database
-pub async fn get_document_unit_from_db(pool: &DbPool, user_id: &str) -> Result<Arc<DocumentUnit>, ServerError> {
+pub async fn get_document_unit_from_db(
+    pool: &DbPool,
+    user_id: &str,
+) -> Result<Arc<DocumentUnit>, ServerError> {
     let record = sqlx::query(
         "SELECT taxpayer_card, internal_passport FROM document_units WHERE user_id = $1",
     )
@@ -177,6 +182,7 @@ pub async fn delete_document_unit(pool: &DbPool, user_id: &str) -> Result<bool, 
 pub struct Agreement {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
     pub date: NaiveDate,
 }
 
@@ -186,15 +192,17 @@ pub async fn create_agreement(pool: &DbPool, agreement: &Agreement) -> Result<()
         r#"
         INSERT INTO agreements (
             tenant_id, 
-            landlord_id, 
+            landlord_id,
+            housing_id,
             date
         )
-        VALUES ($1, $2, $3)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT DO NOTHING
         "#,
     )
     .bind(&agreement.tenant_id)
     .bind(&agreement.landlord_id)
+    .bind(&agreement.housing_id)
     .bind(agreement.date)
     .execute(pool)
     .await
@@ -208,20 +216,23 @@ pub async fn get_agreement(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
+    housing_id: &str,
     date: &NaiveDate,
 ) -> Result<Option<Agreement>, ServerError> {
     let record = sqlx::query(
         r#"
         SELECT 
-            tenant_id, 
-            landlord_id, 
+            tenant_id,
+            landlord_id,
+            housing_id,
             date
         FROM agreements 
-        WHERE tenant_id = $1 AND landlord_id = $2 AND date = $3
+        WHERE tenant_id = $1 AND landlord_id = $2 AND housing_id = $3 AND date = $4
         "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
+    .bind(housing_id)
     .bind(date)
     .fetch_optional(pool)
     .await
@@ -230,6 +241,7 @@ pub async fn get_agreement(
     Ok(record.map(|row| Agreement {
         tenant_id: row.get("tenant_id"),
         landlord_id: row.get("landlord_id"),
+        housing_id: row.get("housing_id"),
         date: row.get("date"),
     }))
 }
@@ -243,7 +255,8 @@ pub async fn get_agreements_for_tenant(
         r#"
         SELECT 
             tenant_id, 
-            landlord_id, 
+            landlord_id,
+            housing_id,
             date
         FROM agreements 
         WHERE tenant_id = $1
@@ -260,6 +273,7 @@ pub async fn get_agreements_for_tenant(
         .map(|row| Agreement {
             tenant_id: row.get("tenant_id"),
             landlord_id: row.get("landlord_id"),
+            housing_id: row.get("housing_id"),
             date: row.get("date"),
         })
         .collect();
@@ -274,9 +288,10 @@ pub async fn get_agreements_for_landlord(
 ) -> Result<Vec<Agreement>, ServerError> {
     let rows = sqlx::query(
         r#"
-        INSERT INTO 
+        SELECT 
             tenant_id, 
-            landlord_id, 
+            landlord_id,
+            housing_id,
             date
         FROM agreements 
         WHERE landlord_id = $1
@@ -293,6 +308,7 @@ pub async fn get_agreements_for_landlord(
         .map(|row| Agreement {
             tenant_id: row.get("tenant_id"),
             landlord_id: row.get("landlord_id"),
+            housing_id: row.get("housing_id"),
             date: row.get("date"),
         })
         .collect();
@@ -310,6 +326,7 @@ pub async fn get_agreements_for_tenant_and_landlord(
         SELECT 
             tenant_id,
             landlord_id,
+            housing_id,
             date
         FROM agreements
         WHERE tenant_id = $1
@@ -328,6 +345,7 @@ pub async fn get_agreements_for_tenant_and_landlord(
         .map(|row| Agreement {
             tenant_id: row.get("tenant_id"),
             landlord_id: row.get("landlord_id"),
+            housing_id: row.get("housing_id"),
             date: row.get("date"),
         })
         .collect();
@@ -340,16 +358,18 @@ pub async fn delete_agreement(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
+    housing_id: &str,
     date: &NaiveDate,
 ) -> Result<bool, ServerError> {
     let result = sqlx::query(
         r#"
         DELETE FROM agreements 
-        WHERE tenant_id = $1 AND landlord_id = $2 AND date = $3
+        WHERE tenant_id = $1 AND landlord_id = $2 AND housing_id = $3 AND date = $4
         "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
+    .bind(housing_id)
     .bind(date)
     .execute(pool)
     .await
@@ -361,6 +381,7 @@ pub async fn delete_agreement(
 pub struct SignatureEntry {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
     pub tenant_signature: String,
     pub landlord_signature: String,
 }
@@ -370,20 +391,23 @@ pub async fn create_signature_entry(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
+    housing_id: &str,
 ) -> Result<bool, ServerError> {
     let result = sqlx::query(
         r#"
         INSERT INTO signatures (
             tenant_id, 
             landlord_id,
+            housing_id,
             tenant_signature,
             landlord_signature,
         )
-        VALUES ($1, $2, "", "")
+        VALUES ($1, $2, $3, "", "")
         "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
+    .bind(housing_id)
     .execute(pool)
     .await
     .context("Failed to create signature entry")?;
@@ -396,6 +420,7 @@ pub async fn add_signature(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
+    housing_id: &str,
     signed_by: &str,
     signature: String,
 ) -> Result<bool, ServerError> {
@@ -408,9 +433,9 @@ pub async fn add_signature(
 
     let query = format!(
         r#"
-        INSERT INTO signatures (tenant_id, landlord_id, tenant_signature, landlord_signature)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (tenant_id, landlord_id)
+        INSERT INTO signatures (tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (tenant_id, landlord_id, housing_id)
         DO UPDATE SET {0} = EXCLUDED.{0}
         "#,
         col_to_set
@@ -425,6 +450,7 @@ pub async fn add_signature(
     let result = sqlx::query(&query)
         .bind(tenant_id)
         .bind(landlord_id)
+        .bind(housing_id)
         .bind(tenant_sig)
         .bind(landlord_sig)
         .execute(pool)
@@ -441,18 +467,21 @@ pub async fn remove_signature_entry(
     pool: &DbPool,
     tenant_id: &str,
     landlord_id: &str,
+    housing_id: &str,
 ) -> Result<Option<SignatureEntry>, ServerError> {
     // First, retrieve the signature entry that's about to be deleted
-    let signature_entry = sqlx::query_as::<_, (String, String, String, String)>(
+    let signature_entry = sqlx::query_as::<_, (String, String, String, String, String)>(
         r#"
-        SELECT tenant_id, landlord_id, tenant_signature, landlord_signature
+        SELECT tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature
         FROM signatures
         WHERE tenant_id = $1
           AND landlord_id = $2
+          AND housing_id = $3
         "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
+    .bind(housing_id)
     .fetch_optional(pool)
     .await
     .context("Failed to fetch signature entry before removal")?;
@@ -463,22 +492,25 @@ pub async fn remove_signature_entry(
         DELETE FROM signatures
         WHERE tenant_id = $1
           AND landlord_id = $2
+          AND housing_id = $3
         "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
+    .bind(housing_id)
     .execute(pool)
     .await
     .context("Failed to remove signature entry")?;
 
     // If we found and deleted an entry, convert it to a SignatureEntry struct
     if result.rows_affected() > 0 {
-        if let Some((tenant_id, landlord_id, tenant_signature, landlord_signature)) =
+        if let Some((tenant_id, landlord_id, housing_id, tenant_signature, landlord_signature)) =
             signature_entry
         {
             return Ok(Some(SignatureEntry {
                 tenant_id,
                 landlord_id,
+                housing_id,
                 tenant_signature,
                 landlord_signature,
             }));

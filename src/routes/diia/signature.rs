@@ -79,6 +79,7 @@ pub async fn handler(
             tenant_id,
             landlord_id,
             signed_by,
+            housing_id,
             ..
         } = serde_json::from_str(
             headers
@@ -99,6 +100,7 @@ pub async fn handler(
             &state.db_pool,
             &tenant_id,
             &landlord_id,
+            &housing_id,
             &signed_by,
             signature,
         )
@@ -110,6 +112,7 @@ pub async fn handler(
             .entry(AgreementProposalKey {
                 tenant_id: tenant_id.clone(),
                 landlord_id: tenant_id.clone(),
+                housing_id: housing_id.clone(),
             })
             .and_compute_with(|entry| {
                 let op = match entry {

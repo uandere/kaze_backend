@@ -18,6 +18,7 @@ use crate::{
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
 }
 
 /// Retuns the data about the latest rental ageement between tenant and landlord.
@@ -28,7 +29,7 @@ pub async fn handler(
 ) -> Result<Response, ServerError> {
     let token = bearer.token();
     let uid = verify_jwt(token, &state).await?;
-    if uid != payload.landlord_id || uid != payload.tenant_id {
+    if uid != payload.landlord_id && uid != payload.tenant_id {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"
         )
@@ -40,6 +41,7 @@ pub async fn handler(
         Arc::new(AgreementProposalKey {
             tenant_id: payload.tenant_id,
             landlord_id: payload.landlord_id,
+            housing_id: payload.housing_id,
         }),
     )
     .await?;

@@ -27,6 +27,7 @@ use crate::{
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
     /// The housing data, like address or area.
     #[serde(default)]
     pub housing_data: HousingData,
@@ -65,11 +66,9 @@ pub async fn handler(
     }
 
 
-    // Trying to get data from the database
     let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
         .await?;
 
-    // Similarly for landlord data
     let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
         .await?;
 
@@ -81,6 +80,7 @@ pub async fn handler(
         .entry(AgreementProposalKey {
             tenant_id: payload.tenant_id.clone(),
             landlord_id: payload.landlord_id.clone(),
+            housing_id: payload.housing_id.clone(),
         })
         .and_compute_with(|entry| {
             let op = match entry {
@@ -159,6 +159,7 @@ pub async fn handler(
         Arc::new(AgreementProposalKey {
             tenant_id: payload.tenant_id,
             landlord_id: payload.landlord_id,
+            housing_id: payload.housing_id,
         }),
     )
     .await?;

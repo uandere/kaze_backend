@@ -39,6 +39,7 @@ pub struct SavedChallengeCache {
 pub struct AgreementProposalKey {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -95,6 +96,7 @@ pub fn build_cache(
                         tenant_id: key.tenant_id.clone(),
                         landlord_id: key.landlord_id.clone(),
                         date: Utc::now().date_naive(),
+                        housing_id: key.housing_id.clone(),
                     },
                 )
                 .await;
@@ -105,7 +107,7 @@ pub fn build_cache(
         }
 
         // extracting signatures and sending them to signature handler 
-        match db::remove_signature_entry(&pool, &key.tenant_id, &key.landlord_id).await {
+        match db::remove_signature_entry(&pool, &key.tenant_id, &key.landlord_id, &key.housing_id).await {
             Ok(maybe_entry) => {
                 match maybe_entry {
                     Some(entry) => {

@@ -19,6 +19,7 @@ use crate::{
 pub enum AgreementStatus {
     NotInitiated,
     Initiated { confirmed_by: String },
+    Rejected,
     Generated,
     HalfSigned { signed_by: String },
     Signed,
@@ -29,6 +30,7 @@ pub enum AgreementStatus {
 pub struct Payload {
     tenant_id: String,
     landlord_id: String,
+    housing_id: String,
     date: Option<NaiveDate>,
 }
 
@@ -44,6 +46,7 @@ pub async fn handler(
     Query(Payload {
         tenant_id,
         landlord_id,
+        housing_id,
         date,
     }): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
@@ -55,6 +58,7 @@ pub async fn handler(
         .get(&AgreementProposalKey {
             tenant_id: tenant_id.clone(),
             landlord_id: landlord_id.clone(),
+            housing_id: housing_id.clone(),
         })
         .await
     {
@@ -87,7 +91,7 @@ pub async fn handler(
 
     // if the agreement is in the database, changing the status to Signed
     if let Some(date) = date {
-        let agreement = get_agreement(&state.db_pool, &tenant_id, &landlord_id, &date).await;
+        let agreement = get_agreement(&state.db_pool, &tenant_id, &landlord_id, &housing_id, &date).await;
         if let Ok(Some(_)) = agreement {
             status = AgreementStatus::Signed;
         }

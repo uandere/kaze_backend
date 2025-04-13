@@ -60,6 +60,7 @@ pub struct SignHashRequestId {
     pub tenant_id: String,
     pub landlord_id: String,
     pub signed_by: String,
+    pub housing_id: String,
     pub seed: Uuid,
 }
 
@@ -72,6 +73,7 @@ struct SignHashResponse {
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
+    pub housing_id: String,
 
     /// This is a backdoor for testing purposes
     pub _uid: Option<String>,
@@ -110,6 +112,7 @@ pub async fn handler(
         Arc::new(AgreementProposalKey {
             tenant_id: payload.tenant_id.clone(),
             landlord_id: payload.landlord_id.clone(),
+            housing_id: payload.housing_id.clone(),
         }),
     )
     .await?;
@@ -150,6 +153,7 @@ pub async fn handler(
         tenant_id: payload.tenant_id,
         landlord_id: payload.landlord_id,
         signed_by: uid,
+        housing_id: payload.housing_id,
         seed: Uuid::new_v4(),
     };
 

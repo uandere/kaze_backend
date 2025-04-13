@@ -71,6 +71,7 @@ pub async fn diia_signature_handler(
     SignatureEntry {
         tenant_id,
         landlord_id,
+        housing_id,
         tenant_signature,
         ..
     }: SignatureEntry,
@@ -80,6 +81,7 @@ pub async fn diia_signature_handler(
         Arc::new(AgreementProposalKey {
             tenant_id: tenant_id.clone(),
             landlord_id: landlord_id.clone(),
+            housing_id: housing_id.clone(),
         }),
     )
     .await?;
@@ -212,6 +214,7 @@ pub async fn diia_signature_handler(
             Arc::new(AgreementProposalKey {
                 tenant_id,
                 landlord_id,
+                housing_id,
             }),
         ).await?;
     }
