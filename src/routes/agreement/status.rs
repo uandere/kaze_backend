@@ -1,4 +1,7 @@
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +22,7 @@ pub enum AgreementStatus {
     Generated,
     HalfSigned { signed_by: String },
     Signed,
+    Expired { timestamp: chrono::NaiveDate },
 }
 
 #[derive(Deserialize)]
