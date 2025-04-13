@@ -23,7 +23,7 @@ use crate::{
     },
 };
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize)]
 pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
@@ -45,12 +45,15 @@ pub struct Payload {
     pub _uid: Option<String>,
 }
 
+#[derive(Serialize)]
+pub struct Response {}
+
 /// Generates rental ageement between tenant and landlord.
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,
-) -> Result<(), ServerError> {
+) -> Result<Json<Response>, ServerError> {
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
@@ -65,13 +68,9 @@ pub async fn handler(
         .into());
     }
 
+    let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id).await?;
 
-    let tenant_data = db::get_document_unit_from_db(&state.db_pool, &payload.tenant_id)
-        .await?;
-
-    let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id)
-        .await?;
-
+    let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id).await?;
 
     info!("Cache before /generate: {:?}", state.cache);
 
@@ -123,11 +122,11 @@ pub async fn handler(
         moka::ops::compute::CompResult::ReplacedWith(entry) => {
             let val = entry.value();
             if !(val.landlord_confirmed && val.tenant_confirmed) {
-                return Ok(());
+                return Ok(Json(Response {}));
             }
         }
         _ => {
-            return Ok(());
+            return Ok(Json(Response {}));
         }
     }
 
@@ -164,5 +163,5 @@ pub async fn handler(
     )
     .await?;
 
-    Ok(())
+    Ok(Json(Response {}))
 }
