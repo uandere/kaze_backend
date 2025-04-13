@@ -111,7 +111,7 @@ pub async fn handler(
             .cache
             .entry(AgreementProposalKey {
                 tenant_id: tenant_id.clone(),
-                landlord_id: tenant_id.clone(),
+                landlord_id: landlord_id.clone(),
                 housing_id: housing_id.clone(),
             })
             .and_compute_with(|entry| {
