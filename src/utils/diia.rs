@@ -7,7 +7,7 @@ use http::{
     HeaderMap, HeaderValue,
 };
 use serde::Deserialize;
-use tracing::error;
+use tracing::{error, info};
 
 use super::{
     cache::AgreementProposalKey,
@@ -134,6 +134,8 @@ pub async fn diia_signature_handler(
             &mut signature_len,
         );
 
+        info!("Here1");
+
         if error_code as u32 != EU_ERROR_NONE {
             return Err(EUSignError(error_code).into());
         }
@@ -152,6 +154,8 @@ pub async fn diia_signature_handler(
             &mut tenant_cert_len,
         );
 
+        info!("Here2");
+
         if error_code as u32 != EU_ERROR_NONE {
             return Err(EUSignError(error_code).into());
         }
@@ -169,6 +173,8 @@ pub async fn diia_signature_handler(
             &mut tenant_info_len,
         );
 
+        info!("Here3");
+
         if error_code as u32 != EU_ERROR_NONE {
             return Err(EUSignError(error_code).into());
         }
@@ -182,6 +188,8 @@ pub async fn diia_signature_handler(
             tenant_signature.len().try_into()?,
             &mut signature_type,
         );
+
+        info!("Here4");
 
         if error_code as u32 != EU_ERROR_NONE {
             return Err(EUSignError(error_code).into());
@@ -199,6 +207,8 @@ pub async fn diia_signature_handler(
             &mut signature,
             &mut signature_len,
         );
+
+        info!("Here5");
 
         if error_code as u32 != EU_ERROR_NONE {
             return Err(EUSignError(error_code).into());
