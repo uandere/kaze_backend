@@ -120,26 +120,6 @@ pub async fn diia_signature_handler(
             .context("wasn't able to get ctx_append_signer handler")?;
 
         // building a CAdeS signature
-        let mut signature = null_mut();
-        let mut signature_len = 0;
-
-        let error_code = ctx_create_empty_sign(
-            state.ctx.lib_ctx as *mut std::ffi::c_void,
-            EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
-            pdf_data,
-            pdf.len().try_into()?,
-            null_mut(),
-            0,
-            &mut signature,
-            &mut signature_len,
-        );
-
-        info!("Here1");
-
-        if error_code as u32 != EU_ERROR_NONE {
-            return Err(EUSignError(error_code).into());
-        }
-
         let mut tenant_cert_info = null_mut();
         let mut tenant_cert = null_mut();
         let mut tenant_cert_len = 0;
@@ -152,6 +132,26 @@ pub async fn diia_signature_handler(
             &mut tenant_cert_info,
             &mut tenant_cert,
             &mut tenant_cert_len,
+        );
+
+        info!("Here1");
+
+        if error_code as u32 != EU_ERROR_NONE {
+            return Err(EUSignError(error_code).into());
+        }
+
+        let mut signature = null_mut();
+        let mut signature_len = 0;
+
+        let error_code = ctx_create_empty_sign(
+            state.ctx.lib_ctx as *mut std::ffi::c_void,
+            EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
+            pdf_data,
+            pdf.len().try_into()?,
+            tenant_cert,
+            tenant_cert_len,
+            &mut signature,
+            &mut signature_len,
         );
 
         info!("Here2");
