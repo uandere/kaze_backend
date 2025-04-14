@@ -196,6 +196,8 @@ pub fn run(
                 .expect("cannot receive google live token verifier"),
         );
 
+        info!("Certificate: {}", cert);
+
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),

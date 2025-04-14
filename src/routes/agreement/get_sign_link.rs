@@ -160,7 +160,7 @@ pub async fn handler(
     // setting up the request
     let request = SignHashRequest {
         offer_id: state.config.diia.offer_signing_id.clone(),
-        return_link: "https://mykaze.org".into(), // TODO: change this to the chat url
+        return_link: "https://mykaze.org".into(),
         request_id: serde_json::to_string(&request_id)?,
         sign_algo: Some("ECDSA".into()),
         data: RequestData {
