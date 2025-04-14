@@ -145,6 +145,7 @@ pub async fn diia_signature_handler(
         // 4) Create an “empty” sign container with the PDF + tenant cert.
         let mut signature = ptr::null_mut();
         let mut signature_len = 0;
+        
         err = ctx_create_empty_sign(
             state.ctx.lib_ctx as *mut c_void,
             EU_CTX_SIGN_ECDSA_WITH_SHA.into(),

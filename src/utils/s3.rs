@@ -46,11 +46,11 @@ pub async fn upload_agreement_p7s(
 }
 
 pub fn get_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
-    key.tenant_id.clone() + "_" + &key.landlord_id
+    key.tenant_id.clone() + "_" + &key.landlord_id + "_" + &key.housing_id
 }
 
 pub fn get_signature_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
-    "signature".to_owned() + "_" + &key.tenant_id + "_" + &key.landlord_id
+    key.tenant_id.clone() + "_" + &key.landlord_id + "_" + &key.housing_id + "_signed"
 }
 
 // Returns a PDF from the S3 bucket
