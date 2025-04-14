@@ -75,6 +75,9 @@ pub async fn handler(
         let result = from_utf8(&result)?;
         let mut result: SignedHash = serde_json::from_str(result)?;
 
+        info!("Result: {:?}", result);
+
+
         let SignHashRequestId {
             tenant_id,
             landlord_id,
@@ -94,6 +97,8 @@ pub async fn handler(
             .context("cannot extract signature")?
             .signature;
 
+        info!("Signature: {}", signature);
+
         // TODO
         // 2. Updating signatures DB
         db::add_signature(
@@ -105,6 +110,8 @@ pub async fn handler(
             signature,
         )
         .await?;
+
+    
 
         // 3. Updating the cache (changing tenant_signed or landlord_singed)
         state

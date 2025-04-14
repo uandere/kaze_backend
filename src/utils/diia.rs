@@ -227,6 +227,8 @@ pub async fn diia_signature_handler(
                 housing_id,
             }),
         ).await?;
+
+        info!("Here6");
     }
 
     Ok(())
