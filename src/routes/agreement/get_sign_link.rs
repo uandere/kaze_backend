@@ -86,6 +86,7 @@ pub struct Response {
 
 /// Generates a Diia Signature deeplink for a user.
 /// The deeplink activation through Diia app will trigger the signing of the agreement.
+/// TODO: only allow if both tenant and landlord already agreed on generating agreement.
 #[axum::debug_handler]
 pub async fn handler(
     State(state): State<ServerState>,
