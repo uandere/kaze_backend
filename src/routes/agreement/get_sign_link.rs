@@ -162,7 +162,7 @@ pub async fn handler(
         offer_id: state.config.diia.offer_signing_id.clone(),
         return_link: "https://mykaze.org".into(), // TODO: change this to the chat url
         request_id: serde_json::to_string(&request_id)?,
-        sign_algo: Some("DSTU".into()),
+        sign_algo: Some("ECDSA".into()),
         data: RequestData {
             hashed_files_signing: HashedFilesSigning {
                 hashed_files: vec![HashedFile {
