@@ -128,8 +128,8 @@ pub async fn diia_signature_handler(
             EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
             pdf_data,
             pdf.len().try_into()?,
-            (*(state.signature_cert)).clone().as_mut_ptr(),
-            state.signature_cert.len().try_into()?,
+            null_mut(),
+            0,
             &mut signature,
             &mut signature_len,
         );
