@@ -133,7 +133,8 @@ pub fn run(
         tokio::spawn(cache_keeper_handle());
 
         // A code to load the EUSign library
-        let cert;
+        let encryption_cert;
+        let signature_cert;
         let lib_ctx: *mut c_void;
         let mut key_ctx: *mut c_void = ptr::null_mut();
 
@@ -154,9 +155,11 @@ pub fn run(
             }
             G_P_IFACE = p_iface;
 
-            let cert_path = config.eusign.sz_path.clone() + &config.eusign.cert_file_name;
+            let encryption_cert_path = config.eusign.sz_path.clone() + &config.eusign.encryption_cert_file_name;
+            let signature_cert_path = config.eusign.sz_path.clone() + &config.eusign.signature_cert_file_name;
 
-            cert = read_file_to_base64(&cert_path)?;
+            encryption_cert = read_file_to_base64(&encryption_cert_path)?;
+            signature_cert = read_file_to_base64(&signature_cert_path)?;
 
             // Creating library context
             lib_ctx = Initialize(config.clone())?;
@@ -196,12 +199,11 @@ pub fn run(
                 .expect("cannot receive google live token verifier"),
         );
 
-        info!("Certificate: {}", cert);
-
         // Cache cloning is cheap, hence using state instead of an extension.
         let server_state = ServerState {
             config: Arc::new(config),
-            cert: Arc::new(cert),
+            encryption_cert: Arc::new(encryption_cert),
+            signature_cert: Arc::new(signature_cert),
             ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
             cache,
             db_pool,
@@ -307,8 +309,10 @@ pub fn run(
 pub struct ServerState {
     /// A config of the server
     pub config: Arc<Config>,
-    /// A base64-encoded certificate, matching the private keys.
-    pub cert: Arc<String>,
+    /// A base64-encoded certificate for signing, matching the private keys.
+    pub signature_cert: Arc<String>,
+    /// A base64-encoded certificate for encryption/decryption
+    pub encryption_cert: Arc<String>,
     /// A pointer to the context of the library
     pub ctx: Arc<EusignContext>,
     /// A cache of agreement proposals

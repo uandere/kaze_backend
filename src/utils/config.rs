@@ -16,7 +16,8 @@ pub struct EUSignConfig {
     pub proxy_password: String,
     pub default_ocsp_server: String,
     pub default_tsp_server: String,
-    pub cert_file_name: String,
+    pub encryption_cert_file_name: String,
+    pub signature_cert_file_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

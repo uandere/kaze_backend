@@ -1141,7 +1141,7 @@ pub unsafe fn decrypt_customer_data(
     let mut pbSenderCert: *mut c_uchar = ptr::null_mut();
     let mut dwSenderCertLength: c_ulong = 0;
     {
-        let c_sender_cert = CString::new(state.cert.as_bytes()).unwrap();
+        let c_sender_cert = CString::new(state.encryption_cert.as_bytes()).unwrap();
         err = base64_decode(
             c_sender_cert.as_ptr() as *mut c_char,
             &mut pbSenderCert as *mut _,
