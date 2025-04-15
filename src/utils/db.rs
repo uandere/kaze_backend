@@ -405,6 +405,39 @@ pub async fn delete_agreement(
     Ok(result.rows_affected() > 0)
 }
 
+/// Delete the latest agreement from the database
+pub async fn delete_latest_agreement(
+    pool: &DbPool,
+    tenant_id: &str,
+    landlord_id: &str,
+    housing_id: &str,
+) -> Result<bool, ServerError> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM agreements
+        WHERE tenant_id = $1
+          AND landlord_id = $2
+          AND housing_id = $3
+          AND date = (
+              SELECT MAX(date)
+              FROM agreements
+              WHERE tenant_id = $1
+                AND landlord_id = $2
+                AND housing_id = $3
+          )
+        "#
+    )
+    .bind(tenant_id)
+    .bind(landlord_id)
+    .bind(housing_id)
+    .execute(pool)
+    .await
+    .context("Failed to delete latest agreement")?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+
 pub struct SignatureEntry {
     pub tenant_id: String,
     pub landlord_id: String,

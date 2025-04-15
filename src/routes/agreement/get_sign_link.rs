@@ -106,6 +106,24 @@ pub async fn handler(
         )
         .into());
     }
+    
+    // checking whether users confirmed the generation
+    match state.cache.get(&AgreementProposalKey { tenant_id: payload.tenant_id.clone(), landlord_id: payload.landlord_id.clone(), housing_id: payload.housing_id.clone() }).await {
+        Some(entry) => {
+            if !(entry.landlord_confirmed && entry.tenant_confirmed) {
+                return Err(anyhow!(
+                    "cannot get a sign link: either tenant or a landlord didn't confirm the generation"
+                )
+                .into());
+            }
+        },
+        None => {
+            return Err(anyhow!(
+                "cannot get a sign link: either tenant or a landlord didn't confirm the generation"
+            )
+            .into());
+        },
+    } 
 
     // getting the file to generate signed hash
     let mut pdf = get_agreement_pdf(

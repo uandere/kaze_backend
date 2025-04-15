@@ -7,7 +7,7 @@ use crate::utils::secrets::get_secret;
 use crate::utils::server_error::EUSignError;
 use crate::utils::shutdown::graceful_shutdown;
 use aws_config::{BehaviorVersion, Region};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 use axum_server::Handle;
 use clap::Parser;
@@ -155,8 +155,10 @@ pub fn run(
             }
             G_P_IFACE = p_iface;
 
-            let encryption_cert_path = config.eusign.sz_path.clone() + &config.eusign.encryption_cert_file_name;
-            let signature_cert_path = config.eusign.sz_path.clone() + &config.eusign.signature_cert_file_name;
+            let encryption_cert_path =
+                config.eusign.sz_path.clone() + &config.eusign.encryption_cert_file_name;
+            let signature_cert_path =
+                config.eusign.sz_path.clone() + &config.eusign.signature_cert_file_name;
 
             encryption_cert = read_file_to_base64(&encryption_cert_path)?;
             signature_cert = read_file_to_base64(&signature_cert_path)?;
@@ -285,6 +287,10 @@ pub fn run(
             .route(
                 "/agreement/status",
                 get(crate::routes::agreement::status::handler),
+            )
+            .route(
+                "/agreement/remove",
+                delete(crate::routes::agreement::remove::handler),
             )
             .layer(cors)
             .with_state(server_state.clone());
