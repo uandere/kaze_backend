@@ -1,4 +1,8 @@
-use std::{ffi::c_void, ptr::{self}, sync::Arc};
+use std::{
+    ffi::c_void,
+    ptr::{self},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Context};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
@@ -96,15 +100,9 @@ pub async fn diia_signature_handler(
         .context("unable to decode base64 tenant signature")?;
 
     // If there's a landlord signature, decode it too.
-    let landlord_sig_bytes = if !landlord_signature.is_empty() {
-        Some(
-            BASE64_STANDARD
-                .decode(&landlord_signature)
-                .context("unable to decode base64 landlord signature")?,
-        )
-    } else {
-        None
-    };
+    let mut landlord_sig_bytes = BASE64_STANDARD
+        .decode(&landlord_signature)
+        .context("unable to decode base64 landlord signature")?;
 
     // 2) Prepare function pointers from EUSign’s global interface:
     unsafe {
@@ -114,9 +112,7 @@ pub async fn diia_signature_handler(
         let ctx_create_empty_sign = (*G_P_IFACE)
             .CtxCreateEmptySign
             .context("EUSign missing CtxCreateEmptySign")?;
-        let get_signer = (*G_P_IFACE)
-            .GetSigner
-            .context("EUSign missing GetSigner")?;
+        let get_signer = (*G_P_IFACE).GetSigner.context("EUSign missing GetSigner")?;
         let get_sign_type = (*G_P_IFACE)
             .GetSignType
             .context("EUSign missing GetSignType")?;
@@ -145,7 +141,7 @@ pub async fn diia_signature_handler(
         // 4) Create an “empty” sign container with the PDF + tenant cert.
         let mut signature = ptr::null_mut();
         let mut signature_len = 0;
-        
+
         err = ctx_create_empty_sign(
             state.ctx.lib_ctx as *mut c_void,
             EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
@@ -164,8 +160,8 @@ pub async fn diia_signature_handler(
         let mut tenant_info = ptr::null_mut();
         let mut tenant_info_len = 0;
         err = get_signer(
-            0,                // sign index
-            ptr::null_mut(),  // if we had a Base64 string, we’d pass it in here
+            0,               // sign index
+            ptr::null_mut(), // if we had a Base64 string, we’d pass it in here
             tenant_sig_bytes.as_mut_ptr(),
             tenant_sig_bytes.len().try_into()?,
             ptr::null_mut(),  // out param for base64 signer
@@ -208,7 +204,6 @@ pub async fn diia_signature_handler(
         }
 
         // 7) If the landlord’s signature is present, do the same “append” again.
-        if let Some(mut lsig) = landlord_sig_bytes {
             info!("---Landlord phase---");
             let mut landlord_cert_info = ptr::null_mut();
             let mut landlord_cert = ptr::null_mut();
@@ -216,8 +211,8 @@ pub async fn diia_signature_handler(
             err = ctx_get_signer_info(
                 state.ctx.lib_ctx as *mut c_void,
                 0,
-                lsig.as_mut_ptr(),
-                lsig.len().try_into()?,
+                landlord_sig_bytes.as_mut_ptr(),
+                landlord_sig_bytes.len().try_into()?,
                 &mut landlord_cert_info,
                 &mut landlord_cert,
                 &mut landlord_cert_len,
@@ -231,8 +226,8 @@ pub async fn diia_signature_handler(
             err = get_signer(
                 0,
                 ptr::null_mut(),
-                lsig.as_mut_ptr(),
-                lsig.len().try_into()?,
+                landlord_sig_bytes.as_mut_ptr(),
+                landlord_sig_bytes.len().try_into()?,
                 ptr::null_mut(),
                 &mut landlord_info,
                 &mut landlord_info_len,
@@ -246,8 +241,8 @@ pub async fn diia_signature_handler(
             err = get_sign_type(
                 0,
                 ptr::null_mut(),
-                lsig.as_mut_ptr(),
-                lsig.len().try_into()?,
+                landlord_sig_bytes.as_mut_ptr(),
+                landlord_sig_bytes.len().try_into()?,
                 &mut landlord_sign_type,
             );
             if err as u32 != EU_ERROR_NONE {
@@ -263,15 +258,14 @@ pub async fn diia_signature_handler(
                 landlord_info_len,
                 landlord_cert,
                 landlord_cert_len,
-                signature,           // pass the container that already has the tenant
+                signature, // pass the container that already has the tenant
                 signature_len,
-                &mut signature,      // updated container
+                &mut signature, // updated container
                 &mut signature_len,
             );
             if err as u32 != EU_ERROR_NONE {
                 return Err(EUSignError(err).into());
             }
-        }
 
         // 8) Now `signature` is a container with 1 or 2 signers. Upload it:
         upload_agreement_p7s(

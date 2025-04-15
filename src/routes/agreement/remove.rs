@@ -77,7 +77,7 @@ pub async fn handler(
     )
     .await?;
 
-    let _removed_signature = remove_signature_entry(
+    let _removed_signatures = remove_signature_entry(
         &state.db_pool,
         &payload.tenant_id,
         &payload.landlord_id,
