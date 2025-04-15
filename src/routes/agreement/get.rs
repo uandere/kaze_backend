@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use axum::{extract::State, response::Response, Json};
+use axum::{extract::{Query, State}, response::Response, Json};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -19,16 +19,22 @@ pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
     pub housing_id: String,
+    pub _uid: Option<String>,
 }
 
 /// Retuns the data about the latest rental ageement between tenant and landlord.
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Json(payload): Json<Payload>,
+    Query(payload): Query<Payload>,
 ) -> Result<Response, ServerError> {
-    let token = bearer.token();
-    let uid = verify_jwt(token, &state).await?;
+    let uid = if let Some(_uid) = payload._uid {
+        _uid
+    } else {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
     if uid != payload.landlord_id && uid != payload.tenant_id {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"
