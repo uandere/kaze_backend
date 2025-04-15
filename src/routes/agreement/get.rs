@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use axum::{extract::{Query, State}, response::Response, Json};
+use axum::{extract::{Query, State}, response::Response};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -35,7 +35,7 @@ pub async fn handler(
         verify_jwt(token, &state).await?
     };
 
-    if uid != payload.landlord_id && uid != payload.tenant_id {
+    if !(uid == payload.landlord_id || uid == payload.tenant_id) {
         return Err(anyhow!(
             "you are not authorized to perform this action: you're not a landlord or a tenant"
         )

@@ -8,7 +8,6 @@ use axum_extra::{
 };
 use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
-use tracing::info;
 use typst_pdf::PdfOptions;
 
 use crate::{
@@ -72,8 +71,6 @@ pub async fn handler(
 
     let landlord_data = db::get_document_unit_from_db(&state.db_pool, &payload.landlord_id).await?;
 
-    info!("Cache before /generate: {:?}", state.cache);
-
     let result = state
         .cache
         .entry(AgreementProposalKey {
@@ -115,10 +112,7 @@ pub async fn handler(
         })
         .await;
 
-    info!("Cache after /generate: {:?}", state.cache);
-
     match result {
-        // If we got two confirmations, actually generating a file
         moka::ops::compute::CompResult::ReplacedWith(entry) => {
             let val = entry.value();
             if !(val.landlord_confirmed && val.tenant_confirmed) {
@@ -130,8 +124,7 @@ pub async fn handler(
         }
     }
 
-    // Here we know for sure that both parties confirmed
-
+    // If we got two confirmations, actually generating a file
     let typst_code = generate(
         &state,
         tenant_data,
