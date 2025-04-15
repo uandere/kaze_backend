@@ -1,7 +1,7 @@
 use std::{ptr::null_mut, sync::Arc};
 
 use anyhow::anyhow;
-use axum::{extract::State, Json};
+use axum::{extract::{Query, State}, Json};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -91,7 +91,7 @@ pub struct Response {
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Json(payload): Json<Payload>,
+    Query(payload): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     let uid = if let Some(_uid) = payload._uid {
         _uid
