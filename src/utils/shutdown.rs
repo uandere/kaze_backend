@@ -58,8 +58,6 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
         EUUnload();
     }
 
-    // TODO: HERE WE NEED TO SAVE THE SERVER'S STATE
-
     // Saving the cache into the file for now
     save_cache_to_a_file(CACHE_SAVE_LOCATION_DEFAULT, state.cache).await;
 

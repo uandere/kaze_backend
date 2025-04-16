@@ -97,9 +97,6 @@ pub async fn handler(
             .context("cannot extract signature")?
             .signature;
 
-        info!("Signature: {}", signature);
-
-        // TODO
         // 2. Updating signatures DB
         db::add_signature(
             &state.db_pool,

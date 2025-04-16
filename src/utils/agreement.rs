@@ -995,14 +995,12 @@ pub async fn generate(
     };
 
     // 11) AppendixOne
-    // TODO: change this to the real price list
     let additional_property = rent_data
         .additional_property
         .into_iter()
         .map(|val| (val.name, AdditionalPropertyValue { uah_price: val.uah_price, amount: val.amount }))
         .collect::<HashMap<_, _>>();
 
-    // TODO: hardcoded data
     let fun_appendix_one = AppendixOne {
         appendix_one_data: AppendixOneData {
             starting_date: TypstDateTime(now),
