@@ -602,12 +602,18 @@ pub struct Signatures {
 }
 
 #[derive(Serialize)]
+pub struct AdditionalPropertyValue {
+    pub uah_price: u64,
+    pub amount: u64,
+}
+
+#[derive(Serialize)]
 pub struct AppendixOneData {
     pub starting_date: TypstDateTime,
     pub place: String,
     pub tenant_initials: String,
     pub landlord_initials: String,
-    pub additional_property: HashMap<String, u64>,
+    pub additional_property: HashMap<String, AdditionalPropertyValue>,
     pub meter_readings: MeterReadings,
 }
 
@@ -807,7 +813,6 @@ pub struct RentData {
     pub min_notice_days_for_visit: u8,
     pub additional_tenants: Vec<String>,
     pub allowed_animals: Vec<String>,
-    // TODO: this needs to be changed
     pub additional_property: Vec<AdditionalPropertyUnit>,
     pub meter_readings: MeterReadings,
 }
@@ -815,8 +820,8 @@ pub struct RentData {
 #[derive(Deserialize, Serialize, Default)]
 pub struct AdditionalPropertyUnit {
     name: String,
-    currency: String,
-    price: u64,
+    amount: u64,
+    uah_price: u64,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -994,7 +999,7 @@ pub async fn generate(
     let additional_property = rent_data
         .additional_property
         .into_iter()
-        .map(|val| (val.name, 1_u64))
+        .map(|val| (val.name, AdditionalPropertyValue { uah_price: val.uah_price, amount: val.amount }))
         .collect::<HashMap<_, _>>();
 
     // TODO: hardcoded data

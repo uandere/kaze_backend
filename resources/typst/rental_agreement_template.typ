@@ -438,7 +438,7 @@
 
   Ми, що нижче підписалися, Орендодавець, з одного боку, і Орендар, з іншого боку, склали цей акт про те, що відповідно зазначеного вище Договору Орендодавець передав, а Орендар прийняв у тимчасове оплатне користування (оренду) нерухоме майно (далі Об’єкт нерухомості) з усіма невід’ємними технічними пристроями і з предметами домашньої обстановки (далі Майно):
   *#for (key, value) in appendix_one_data.additional_property {
-    [- #key: #value шт.]
+    [- #key: #value.uah_price грн. (#value.amount шт.)]
   }*
 
   Об’єкт нерухомості та Майно в ньому, передані Орендарю в придатному для використання за призначенням стані. Орендар зобов’язується забезпечити збереження та повернути Орендодавцеві Об’єкт нерухомості та Майно в ньому, у належному стані, з урахуванням нормального фізичного зносу і амортизації.
@@ -453,7 +453,7 @@
         День: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
         Ніч: #appendix_one_data.meter_readings.electricity.readings.at(1)
       ] 
-    } else {
+    } else if appendix_one_data.meter_readings.electricity.type == "TripleRate" {
       [
         Пік: #appendix_one_data.meter_readings.electricity.readings.at(0)\;
         Полупік: #appendix_one_data.meter_readings.electricity.readings.at(1)\;
@@ -473,8 +473,8 @@
       Показник лічильника холодної води: #appendix_one_data.meter_readings.water.readings.at(1) (м#super[3])
     ]
   }#linebreak()
-  Показник лічильника опалення: #appendix_one_data.meter_readings.heating.readings.at(0) (Гкал) #linebreak()
-  Показник лічильника газу: #appendix_one_data.meter_readings.gas.readings.at(0) (м#super[3])
+  Показник лічильника опалення: #appendix_one_data.meter_readings.heating.readings (Гкал) #linebreak()
+  Показник лічильника газу: #appendix_one_data.meter_readings.gas.readings (м#super[3])
 
   #align(center)[*Підписи сторін*]
 
@@ -543,6 +543,3 @@
     ],
   )
 ]
-//////////////////////////////////////////////////
-//                     BODY                     //
-//////////////////////////////////////////////////
