@@ -57,7 +57,7 @@ impl IntoResponse for ServerError {
             }
             ServerError::Internal(err) => {
                 // Log the full chain for debugging.
-                error!(error = %err, "Unhandled internal error");
+                error!(error = %err, "Unhandled internal error: ");
                 json(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
