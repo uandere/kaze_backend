@@ -98,7 +98,6 @@ pub fn run(
             .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
 
         // Initialize database connection
-        info!("Connecting to database...");
         let db_pool = init_db_pool(
             &db_config.host,
             db_config.port,
