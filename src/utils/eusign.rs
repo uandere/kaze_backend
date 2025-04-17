@@ -61,7 +61,7 @@ impl Default for EU_ENVELOP_INFO {
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut s_Iface: EU_INTERFACE = EU_INTERFACE {
+pub static s_Iface: EU_INTERFACE = EU_INTERFACE {
     Initialize: Some(EUInitialize),
     IsInitialized: Some(EUIsInitialized),
     Finalize: Some(EUFinalize),

@@ -136,13 +136,15 @@ pub async fn handler(
     )
     .await?;
 
-    let world = TypstWrapperWorld::new("./".to_owned(), typst_code.to_owned());
-
-    let document = typst::compile(&world)
-        .output
-        .map_err(|e| anyhow!("cannot compile Typst document {:?}", e))?;
-
-    let pdf = typst_pdf::pdf(&document, &PdfOptions::default()).expect("Error exporting PDF");
+    let pdf = tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+        let world = TypstWrapperWorld::new("./".to_owned(), typst_code);
+        let document = typst::compile(&world)
+            .output
+            .map_err(|e| anyhow!("cannot compile Typst document {:?}", e))?;
+        Ok(typst_pdf::pdf(&document, &PdfOptions::default())
+            .expect("Error exporting PDF"))
+    })
+    .await??;
 
     // writing a file to S3 with a corresponding key
     s3::upload_agreement_pdf(
