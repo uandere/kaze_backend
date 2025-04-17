@@ -8,7 +8,8 @@ use crate::{
 use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
 use serde::Serialize;
-use tracing::{error, info};
+use tokio::io::AsyncWriteExt;
+use tracing::info;
 
 #[derive(Serialize)]
 pub struct Response {
@@ -58,10 +59,10 @@ pub async fn handler(
 
         // TODO: remove
         {
-            if let Err(e) = std::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone()) {
-                error!(error = %e);
-                return Err(e.into());
-            }
+            let _ = tokio::fs::create_dir_all(format!("tests/mockup_users/{number}/")).await;
+            let mut file = tokio::fs::File::create(format!("tests/mockup_users/{number}/{file_name}")).await?;
+
+            file.write_all(&value).await?;
         }
 
         if name != "encodeData" {

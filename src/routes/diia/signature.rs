@@ -15,6 +15,7 @@ use base64::{prelude::BASE64_STANDARD, Engine as _};
 use http::HeaderMap;
 use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
 use tracing::info;
 
 #[derive(Serialize)]
@@ -59,7 +60,10 @@ pub async fn handler(
 
         // TODO: remove
         {
-            std::fs::write("tests/mockup_signature", value.clone())?;
+            let _ = tokio::fs::create_dir_all("tests/".to_string()).await;
+            let mut file = tokio::fs::File::create("tests/mockup_signature".to_string()).await?;
+
+            file.write_all(&value).await?;
         }
 
         info!("Field Name: {}", name);
