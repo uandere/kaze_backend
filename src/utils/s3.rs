@@ -79,3 +79,30 @@ pub async fn get_agreement_pdf(
 
     Ok(result)
 }
+
+// Returns a signed PDF from the S3 bucket.
+pub async fn get_agreement_ps7(
+    state: &ServerState,
+    agreement_proposal_key: Arc<AgreementProposalKey>,
+) -> Result<Vec<u8>, ServerError> {
+    let mut object = state
+        .aws_s3_client
+        .get_object()
+        .bucket(state.s3_bucket_name.clone())
+        .key(get_signature_key_for_s3(agreement_proposal_key))
+        .send()
+        .await?;
+
+    let mut result = vec![];
+
+    while let Some(bytes) = object
+        .body
+        .try_next()
+        .await
+        .map_err(|err| anyhow!("Failed to read from S3 download stream: {err:?}"))?
+    {
+        result.append(&mut bytes.to_vec());
+    }
+
+    Ok(result)
+}

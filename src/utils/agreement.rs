@@ -832,10 +832,16 @@ pub struct RequisitesData {
     landlord_email: String,
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize)]
 pub struct OwneshipData {
     pub record_number: String,
     pub date: NaiveDateTime,
+}
+
+impl Default for OwneshipData {
+    fn default() -> Self {
+        Self { record_number: "012345678".into(), date: Utc::now().naive_local() }
+    }
 }
 
 ////////////////////////////////////////////////////////////////
