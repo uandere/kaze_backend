@@ -142,14 +142,12 @@ pub fn run(
             let error_code = EULoad();
             if error_code as u32 != EU_ERROR_NONE {
                 // Means it failed
-                error!("{}", get_error_message(error_code));
                 return Err(EUSignError(error_code).into());
             }
 
             // 2) Get the interface pointer
             let p_iface = EUGetInterface();
             if p_iface.is_null() {
-                error!("{}", get_error_message(EU_ERROR_LIBRARY_LOAD.into()));
                 EUUnload();
                 return Err(EUSignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
             }
@@ -180,7 +178,6 @@ pub fn run(
             );
 
             if error_code as u32 != EU_ERROR_NONE {
-                error!("{}", get_error_message(error_code));
                 return Err(EUSignError(error_code).into());
             }
         }

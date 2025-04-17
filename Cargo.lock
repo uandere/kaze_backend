@@ -2640,6 +2640,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tar",
+ "thiserror 2.0.12",
  "time",
  "tokio",
  "tokio-util",
