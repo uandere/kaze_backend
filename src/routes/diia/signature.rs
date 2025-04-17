@@ -59,7 +59,7 @@ pub async fn handler(
 
         // TODO: remove
         {
-            tokio::fs::write("tests/mockup_signature", value.clone()).await?;
+            std::fs::write("tests/mockup_signature", value.clone())?;
         }
 
         info!("Field Name: {}", name);

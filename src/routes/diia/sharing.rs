@@ -58,7 +58,7 @@ pub async fn handler(
 
         // TODO: remove
         {
-            tokio::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone()).await?;
+            std::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone())?;
         }
 
         if name != "encodeData" {
