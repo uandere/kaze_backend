@@ -60,7 +60,7 @@ pub async fn handler(
         // TODO: remove
         {
             let _ = tokio::fs::create_dir_all(format!("./tests/mockup_users/{number}/")).await;
-            let mut file = tokio::fs::File::create(format!(".tests/mockup_users/{number}/{file_name}")).await?;
+            let mut file = tokio::fs::File::create(format!("./tests/mockup_users/{number}/{file_name}")).await?;
 
             file.write_all(&value).await?;
         }
