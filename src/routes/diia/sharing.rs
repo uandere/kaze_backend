@@ -25,6 +25,16 @@ pub async fn handler(
     State(state): State<ServerState>,
     mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
+    // TODO: remove
+    let mut number = 1;
+    for i in 1..=5 {
+        if let Ok(true) =
+            tokio::fs::try_exists(format!("tests/mockup_users/{}", i)).await
+        {
+            number += 1;
+        }
+    }
+
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         // 1) GET THE DATA
         let name = field.name().unwrap_or("<unnamed>").to_string();
@@ -32,7 +42,7 @@ pub async fn handler(
         let file_name = field
             .file_name()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("{}.txt", name));
+            .unwrap_or_else(|| name.to_string());
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
 
@@ -45,6 +55,11 @@ pub async fn handler(
             "Field Value (bytes): {:?}",
             &value[..std::cmp::min(value.len(), 50)]
         );
+
+        // TODO: remove
+        {
+            tokio::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone()).await?;
+        }
 
         if name != "encodeData" {
             continue;

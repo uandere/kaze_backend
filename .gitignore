@@ -8,3 +8,4 @@ CA-*.p7b
 .config/
 libs/eusign/pkey
 libs/eusign/certificates
+tests/

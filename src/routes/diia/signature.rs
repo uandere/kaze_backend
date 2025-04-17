@@ -53,9 +53,14 @@ pub async fn handler(
         let file_name = field
             .file_name()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("{}.txt", name));
+            .unwrap_or_else(|| name.to_string());
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
+
+        // TODO: remove
+        {
+            tokio::fs::write("tests/mockup_signature", value.clone()).await?;
+        }
 
         info!("Field Name: {}", name);
         info!("File Name: {}", file_name);
