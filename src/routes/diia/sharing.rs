@@ -8,7 +8,7 @@ use crate::{
 use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
 use serde::Serialize;
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(Serialize)]
 pub struct Response {
@@ -58,7 +58,10 @@ pub async fn handler(
 
         // TODO: remove
         {
-            std::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone())?;
+            if let Err(e) = std::fs::write(format!("tests/mockup_users/{number}/{file_name}"), value.clone()) {
+                error!(error = %e);
+                return Err(e.into());
+            }
         }
 
         if name != "encodeData" {
