@@ -285,6 +285,10 @@ pub fn run(
                 get(crate::routes::agreement::get::handler),
             )
             .route(
+                "/agreement/get_signed",
+                get(crate::routes::agreement::get_signed::handler),
+            )
+            .route(
                 "/agreement/status",
                 get(crate::routes::agreement::status::handler),
             )
