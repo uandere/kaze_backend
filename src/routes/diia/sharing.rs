@@ -30,7 +30,7 @@ pub async fn handler(
     let mut number = 1;
     for i in 1..=5 {
         if let Ok(true) =
-            tokio::fs::try_exists(format!("tests/mockup_users/{}", i)).await
+            tokio::fs::try_exists(format!("./tests/mockup_users/{}", i)).await
         {
             number += 1;
         }
@@ -59,8 +59,8 @@ pub async fn handler(
 
         // TODO: remove
         {
-            let _ = tokio::fs::create_dir_all(format!("tests/mockup_users/{number}/")).await;
-            let mut file = tokio::fs::File::create(format!("tests/mockup_users/{number}/{file_name}")).await?;
+            let _ = tokio::fs::create_dir_all(format!("./tests/mockup_users/{number}/")).await;
+            let mut file = tokio::fs::File::create(format!(".tests/mockup_users/{number}/{file_name}")).await?;
 
             file.write_all(&value).await?;
         }
