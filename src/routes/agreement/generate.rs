@@ -47,7 +47,7 @@ pub struct Payload {
 #[derive(Serialize)]
 pub struct Response {}
 
-/// Generates rental ageement between tenant and landlord.
+/// Generates a rental ageement between tenant and landlord.
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
