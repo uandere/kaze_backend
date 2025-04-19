@@ -24,7 +24,7 @@ use reqwest::Client;
 use tokio::time::{sleep, Instant};
 
 /// where the backend listens
-const BASE: &str = "http://127.0.0.1:3000";
+const BASE: &str = "https://www.kazeapi.uk";
 
 /// helper – write a vector of `Duration`s into a CSV (idx, ms)
 fn dump_durations(name: &str, durs: &[Duration]) -> Result<()> {
@@ -50,8 +50,10 @@ fn dump_signing(name: &str, sign: &[Duration], waits: &[Duration]) -> Result<()>
     Ok(())
 }
 
-#[tokio::test]
-async fn bench() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    let _ = tracing_subscriber::fmt::try_init();
+    
     // prepare requests
     let common::Setup {
         sharing_requests,

@@ -1,24 +1,91 @@
 #![allow(async_fn_in_trait)]
 use anyhow::anyhow;
-use serde::Serialize;
-use std::fs;
+use serde::{Deserialize, Serialize};
+use std::{ffi::c_int, fs};
 
 use anyhow::Result;
 use chrono::Duration;
 use http::{
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     HeaderMap, HeaderValue,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use kaze_backend::{
-    routes::{
-        agreement::get_sign_link::SignHashRequestId, user::get_sharing_link::DiiaSharingRequestId,
-    },
-    utils::{config::Config, diia::SessionTokenResponse},
-};
-use reqwest::{multipart, Client};
+
+use reqwest::{Client, multipart};
 use uuid::Uuid;
 
 use tokio::time::Instant;
+
+// use kaze_backend::{
+//     routes::{
+//         agreement::get_sign_link::SignHashRequestId, user::get_sharing_link::DiiaSharingRequestId,
+//     },
+//     utils::{config::Config, diia::SessionTokenResponse},
+// };
+
+#[derive(Serialize, Deserialize)]
+pub struct SignHashRequestId {
+    pub tenant_id: String,
+    pub landlord_id: String,
+    pub signed_by: String,
+    pub housing_id: String,
+    pub seed: Uuid,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DiiaSharingRequestId {
+    pub uid: String,
+    pub seed: Uuid,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct EUSignConfig {
+    pub private_key_path: String,
+    pub private_key_password: String,
+    pub cas_json_path: String,
+    pub ca_certificates_path: String,
+    pub sz_path: String,
+    pub proxy_use: c_int,
+    pub proxy_address: String,
+    pub proxy_port: String,
+    pub proxy_user: String,
+    pub proxy_password: String,
+    pub default_ocsp_server: String,
+    pub default_tsp_server: String,
+    pub encryption_cert_file_name: String,
+    pub signature_cert_file_name: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DiiaConfig {
+    pub acquirer_token: String,
+    pub auth_acquirer_token: String,
+    pub host: String,
+    pub branch_id: String,
+    pub offer_sharing_id: String,
+    pub offer_signing_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Config {
+    pub eusign: EUSignConfig,
+    pub diia: DiiaConfig,
+}
+
+impl Config {
+    pub fn new(path: &str) -> Self {
+        let config_file_content = fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!("unable to read the config file at path: {path}, error: {e}")
+        });
+
+        toml::from_str(&config_file_content)
+            .unwrap_or_else(|e| panic!("cannot parse config file: {e}"))
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SessionTokenResponse {
+    pub token: String,
+}
 
 /// Sends a request, consuming it's body
 pub trait Request {
@@ -116,7 +183,7 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
     let mut setup = Setup::default();
 
     // constructing sharing requests
-    for i in 1..5 {
+    for i in 1..=5 {
         let mut sharing_request = SharingRequest::default();
         for entry in fs::read_dir(format!("{users_dir}/landlords/{i}"))? {
             let entry = entry?;
@@ -161,7 +228,7 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
     }
 
     // constructing generating requests
-    for i in 1..5 {
+    for i in 1..=5 {
         let mut generate_request = GenerateRequest {
             headers: HeaderMap::new(),
             content: GenerateRequestContent {
@@ -181,7 +248,7 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
 
     // constructing signing requests
     let encode_data = fs::read(path_to_signature)?;
-    for i in 1..5 {
+    for i in 1..=5 {
         let mut signing_request = SigningRequest::default();
         signing_request.content.encode_data.content = encode_data.clone();
         signing_request.content.encode_data.file_name = "encodeData".to_string();
@@ -246,12 +313,19 @@ impl Request for SharingRequest {
 
         // headers added here – no need for the deleted loop
         let start = Instant::now();
-        client
-            .post(url)
+        let resp = client
+            .post(url.clone())
             .headers(self.headers.clone())
             .multipart(form)
             .send()
             .await?;
+
+        tracing::info!("POST {} -> {}", url, resp.status());
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!("error-body: {}", body);
+        }
+
         Ok(to_chrono(start.elapsed()))
     }
 }
@@ -271,12 +345,19 @@ impl Request for SigningRequest {
         );
 
         let start = Instant::now();
-        client
-            .post(url)
+        let resp = client
+            .post(url.clone())
             .headers(self.headers.clone())
             .multipart(form)
             .send()
             .await?;
+
+        tracing::info!("POST {} -> {}", url, resp.status());
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!("error-body: {}", body);
+        }
+
         Ok(to_chrono(start.elapsed()))
     }
 }
@@ -290,12 +371,19 @@ impl Request for GenerateRequest {
         let client = Client::new();
 
         let start = Instant::now();
-        client
-            .post(url)
+        let resp = client
+            .post(url.clone())
             .headers(self.headers.clone())
             .json(&self.content) // JSON body
             .send()
             .await?;
+
+        tracing::info!("POST {} -> {}", url, resp.status());
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            tracing::error!("error-body: {}", body);
+        }
+
         Ok(to_chrono(start.elapsed()))
     }
 }

@@ -103,7 +103,16 @@ pub async fn handler(
                     }
                 }
                 None => {
-                    if uid == payload.tenant_id {
+                    // TODO: remove this ===================================
+                    if uid == payload.tenant_id && uid == payload.landlord_id {
+                        Op::Put(Arc::new(AgreementProposalValue {
+                            tenant_confirmed: true,
+                            landlord_confirmed: true,
+                            ..Default::default()
+                        }))
+                    }
+                    // TODO: remove this ===================================
+                    else if uid == payload.tenant_id {
                         Op::Put(Arc::new(AgreementProposalValue {
                             tenant_confirmed: true,
                             ..Default::default()
