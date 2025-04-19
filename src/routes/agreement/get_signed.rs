@@ -42,22 +42,26 @@ pub async fn handler(
         .into());
     }
 
+    let key = Arc::new(AgreementProposalKey {
+        tenant_id: payload.tenant_id.clone(),
+        landlord_id: payload.landlord_id.clone(),
+        housing_id: payload.housing_id.clone(),
+    });
+
     let pdf_signed = s3::get_agreement_ps7(
         &state,
-        Arc::new(AgreementProposalKey {
-            tenant_id: payload.tenant_id,
-            landlord_id: payload.landlord_id,
-            housing_id: payload.housing_id,
-        }),
+        key.clone(),
     )
     .await?;
 
+    let filename = s3::get_signature_key_for_s3(key);
+
     let response = Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/pdf")
+        .header(header::CONTENT_TYPE, "application/pkcs7-signature")
         .header(
             header::CONTENT_DISPOSITION,
-            "attachment; filename=\"agreement.pdf\"",
+            format!("attachment; filename=\"{filename}.p7s\""),
         )
         .body(axum::body::Body::from(pdf_signed))
         .map_err(|e| anyhow!(e.to_string()))?;

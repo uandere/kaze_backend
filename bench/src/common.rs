@@ -1,4 +1,5 @@
 #![allow(async_fn_in_trait)]
+#![allow(dead_code)]
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::{ffi::c_int, fs};
@@ -14,13 +15,6 @@ use reqwest::{Client, multipart};
 use uuid::Uuid;
 
 use tokio::time::Instant;
-
-// use kaze_backend::{
-//     routes::{
-//         agreement::get_sign_link::SignHashRequestId, user::get_sharing_link::DiiaSharingRequestId,
-//     },
-//     utils::{config::Config, diia::SessionTokenResponse},
-// };
 
 #[derive(Serialize, Deserialize)]
 pub struct SignHashRequestId {
@@ -206,10 +200,6 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
         }
 
         sharing_request.headers.append(
-            CONTENT_TYPE,
-            HeaderValue::from_static("multipart/form-data"),
-        );
-        sharing_request.headers.append(
             AUTHORIZATION,
             HeaderValue::from_str(&format!("Bearer {diia_session_token}"))?,
         );
@@ -241,6 +231,11 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
 
         generate_request
             .headers
+            .insert(AUTHORIZATION, HeaderValue::from_static("Bearer dummy_token"));
+
+
+        generate_request
+            .headers
             .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         setup.generate_requests.push(generate_request);
@@ -253,11 +248,6 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
         signing_request.content.encode_data.content = encode_data.clone();
         signing_request.content.encode_data.file_name = "encodeData".to_string();
         signing_request.content.encode_data.name = "encodeData".to_string();
-
-        signing_request.headers.append(
-            CONTENT_TYPE,
-            HeaderValue::from_static("multipart/form-data"),
-        );
 
         signing_request.headers.append(
             "X-Document-Request-Trace-Id",

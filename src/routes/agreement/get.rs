@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use axum::{extract::{Query, State}, response::Response};
+use axum::{
+    extract::{Query, State},
+    response::Response,
+};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -42,22 +45,22 @@ pub async fn handler(
         .into());
     }
 
-    let pdf = s3::get_agreement_pdf(
-        &state,
-        Arc::new(AgreementProposalKey {
-            tenant_id: payload.tenant_id,
-            landlord_id: payload.landlord_id,
-            housing_id: payload.housing_id,
-        }),
-    )
-    .await?;
+    let key = Arc::new(AgreementProposalKey {
+        tenant_id: payload.tenant_id.clone(),
+        landlord_id: payload.landlord_id.clone(),
+        housing_id: payload.housing_id.clone(),
+    });
+
+    let pdf = s3::get_agreement_pdf(&state, key.clone()).await?;
+
+    let filename = s3::get_key_for_s3(key);
 
     let response = Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/pdf")
         .header(
             header::CONTENT_DISPOSITION,
-            "attachment; filename=\"agreement.pdf\"",
+            format!("attachment; filename=\"{filename}.pdf\""),
         )
         .body(axum::body::Body::from(pdf))
         .map_err(|e| anyhow!(e.to_string()))?;
