@@ -11,7 +11,6 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 use axum_server::Handle;
 use clap::Parser;
-use http::Method;
 use rs_firebase_admin_sdk::auth::token::cache::HttpCache;
 use rs_firebase_admin_sdk::auth::token::crypto::JwtRsaPubKey;
 use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
@@ -246,7 +245,7 @@ pub fn run(
 
         let cors = CorsLayer::new()
             .allow_headers(Any)
-            .allow_methods([Method::GET, Method::POST])
+            .allow_methods(Any)
             .allow_origin(Any);
 
         let app = Router::new()
@@ -263,6 +262,14 @@ pub fn run(
             .route(
                 "/user/get_sharing_link",
                 get(crate::routes::user::get_sharing_link::handler),
+            )
+            .route(
+                "/user/name",
+                get(crate::routes::user::name::handler),
+            )
+            .route(
+                "/user/remove",
+                delete(crate::routes::user::remove::handler),
             )
             .route(
                 "/agreement/generate",
