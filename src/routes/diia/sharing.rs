@@ -8,7 +8,6 @@ use crate::{
 use anyhow::anyhow;
 use axum::extract::{Json, Multipart, State};
 use serde::Serialize;
-use tokio::io::AsyncWriteExt;
 use tracing::info;
 
 #[derive(Serialize)]
@@ -26,16 +25,6 @@ pub async fn handler(
     State(state): State<ServerState>,
     mut multipart: Multipart,
 ) -> Result<Json<Response>, ServerError> {
-    // TODO: remove
-    let mut number = 1;
-    for i in 1..=5 {
-        if let Ok(true) =
-            tokio::fs::try_exists(format!("./tests/mockup_users/tenants/{}", i)).await
-        {
-            number += 1;
-        }
-    }
-
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         // 1) GET THE DATA
         let name = field.name().unwrap_or("<unnamed>").to_string();
@@ -56,14 +45,6 @@ pub async fn handler(
             "Field Value (bytes): {:?}",
             &value[..std::cmp::min(value.len(), 50)]
         );
-
-        // TODO: remove
-        {
-            let _ = tokio::fs::create_dir_all(format!("./tests/mockup_users/tenants/{number}/")).await;
-            let mut file = tokio::fs::File::create(format!("./tests/mockup_users/tenants/{number}/{file_name}")).await?;
-
-            file.write_all(&value).await?;
-        }
 
         if name != "encodeData" {
             continue;

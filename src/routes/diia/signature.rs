@@ -15,7 +15,6 @@ use base64::{prelude::BASE64_STANDARD, Engine as _};
 use http::HeaderMap;
 use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
 use tracing::info;
 
 #[derive(Serialize)]
@@ -57,14 +56,6 @@ pub async fn handler(
             .unwrap_or_else(|| name.to_string());
         let content_type = field.content_type().map(|s| s.to_string());
         let value = field.bytes().await.unwrap_or_else(|_| vec![].into());
-
-        // TODO: remove
-        {
-            let _ = tokio::fs::create_dir_all("./tests/".to_string()).await;
-            let mut file = tokio::fs::File::create("./tests/mockup_signature".to_string()).await?;
-
-            file.write_all(&value).await?;
-        }
 
         info!("Field Name: {}", name);
         info!("File Name: {}", file_name);
@@ -129,7 +120,16 @@ pub async fn handler(
             .and_compute_with(|entry| {
                 let op = match entry {
                     Some(entry) => {
-                        if signed_by == tenant_id {
+                        // TODO: remove this ===================================
+                        if signed_by == tenant_id && signed_by == landlord_id {
+                            Op::Put(Arc::new(AgreementProposalValue {
+                                tenant_signed: true,
+                                landlord_signed: true,
+                                ..*entry.into_value().as_ref()
+                            }))
+                        }
+                        // TODO: remove this ===================================
+                        else if signed_by == tenant_id {
                             Op::Put(Arc::new(AgreementProposalValue {
                                 tenant_signed: true,
                                 ..*entry.into_value().as_ref()

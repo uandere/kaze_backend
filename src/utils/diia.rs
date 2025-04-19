@@ -24,7 +24,7 @@ use crate::commands::server::ServerState;
 
 #[derive(Deserialize)]
 pub struct SessionTokenResponse {
-    token: String,
+    pub token: String,
 }
 
 /// This function refreshes the Diia session token.
