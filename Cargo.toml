@@ -30,7 +30,7 @@ zune-inflate = "0.2.54"
 tar = "0.4.44"
 time = "0.3.41"
 rs-firebase-admin-sdk = "2.4.0"
-reqwest = "0.12.15"
+reqwest = { version = "0.12.15", features = ["multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 sqlx = { version = "0.8.3", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
 aws-config = { version = "1.6.1", features = ["behavior-version-latest"] }
@@ -45,3 +45,6 @@ thiserror = "2.0.12"
 
 [build-dependencies]
 bindgen = "0.71.1"
+
+[dev-dependencies]
+csv = "1.3"

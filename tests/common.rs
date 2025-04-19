@@ -1,5 +1,6 @@
 #![allow(async_fn_in_trait)]
 use anyhow::anyhow;
+use serde::Serialize;
 use std::fs;
 
 use anyhow::Result;
@@ -14,10 +15,14 @@ use kaze_backend::{
     },
     utils::{config::Config, diia::SessionTokenResponse},
 };
+use reqwest::{multipart, Client};
 use uuid::Uuid;
 
+use tokio::time::Instant;
+
+/// Sends a request, consuming it's body
 pub trait Request {
-    async fn send(&self, endpoint: &str) -> Result<Duration>;
+    async fn send(self, endpoint: &str) -> Result<Duration>;
 }
 
 #[derive(Default)]
@@ -51,7 +56,7 @@ pub struct SigningRequest {
     pub content: SigningRequestContent,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 pub struct GenerateRequestContent {
     pub tenant_id: String,
     pub landlord_id: String,
@@ -206,4 +211,91 @@ pub async fn setup(path_to_signature: &str, users_dir: &str) -> Result<Setup> {
     }
 
     Ok(setup)
+}
+
+// Helper – turn std::time::Duration into chrono::Duration
+pub fn to_chrono(d: std::time::Duration) -> chrono::Duration {
+    chrono::Duration::microseconds(d.as_micros() as i64)
+}
+
+//──────────────────────────────────────────────────────────────────────────────
+// 1.  POST /diia/sharing
+//──────────────────────────────────────────────────────────────────────────────
+impl Request for SharingRequest {
+    async fn send(self, base: &str) -> Result<Duration> {
+        let url = format!("{base}/diia/sharing");
+        let client = Client::new();
+
+        // build multipart
+        let form = multipart::Form::new()
+            .part(
+                self.content.internal_passport.name,
+                multipart::Part::bytes(self.content.internal_passport.content)
+                    .file_name(self.content.internal_passport.file_name),
+            )
+            .part(
+                self.content.taxpayer_card.name,
+                multipart::Part::bytes(self.content.taxpayer_card.content)
+                    .file_name(self.content.taxpayer_card.file_name),
+            )
+            .part(
+                self.content.encode_data.name,
+                multipart::Part::bytes(self.content.encode_data.content)
+                    .file_name(self.content.encode_data.file_name),
+            );
+
+        // headers added here – no need for the deleted loop
+        let start = Instant::now();
+        client
+            .post(url)
+            .headers(self.headers.clone())
+            .multipart(form)
+            .send()
+            .await?;
+        Ok(to_chrono(start.elapsed()))
+    }
+}
+
+//──────────────────────────────────────────────────────────────────────────────
+// 2.  POST /diia/signature
+//──────────────────────────────────────────────────────────────────────────────
+impl Request for SigningRequest {
+    async fn send(self, base: &str) -> Result<Duration> {
+        let url = format!("{base}/diia/signature");
+        let client = Client::new();
+
+        let form = multipart::Form::new().part(
+            self.content.encode_data.name,
+            multipart::Part::bytes(self.content.encode_data.content.clone())
+                .file_name(self.content.encode_data.file_name.clone()),
+        );
+
+        let start = Instant::now();
+        client
+            .post(url)
+            .headers(self.headers.clone())
+            .multipart(form)
+            .send()
+            .await?;
+        Ok(to_chrono(start.elapsed()))
+    }
+}
+
+//──────────────────────────────────────────────────────────────────────────────
+// 3.  POST /agreement/generate
+//──────────────────────────────────────────────────────────────────────────────
+impl Request for GenerateRequest {
+    async fn send(self, base: &str) -> Result<Duration> {
+        let url = format!("{base}/agreement/generate");
+        let client = Client::new();
+
+        let start = Instant::now();
+        client
+            .post(url)
+            .headers(self.headers.clone())
+            .json(&self.content) // JSON body
+            .send()
+            .await?;
+        Ok(to_chrono(start.elapsed()))
+    }
 }

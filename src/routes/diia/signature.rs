@@ -75,8 +75,6 @@ pub async fn handler(
         let result = from_utf8(&result)?;
         let mut result: SignedHash = serde_json::from_str(result)?;
 
-        // info!("Result: {:?}", result);
-
         let SignHashRequestId {
             tenant_id,
             landlord_id,

@@ -425,7 +425,7 @@ pub async fn delete_latest_agreement(
                 AND landlord_id = $2
                 AND housing_id = $3
           )
-        "#
+        "#,
     )
     .bind(tenant_id)
     .bind(landlord_id)
@@ -436,7 +436,6 @@ pub async fn delete_latest_agreement(
 
     Ok(result.rows_affected() > 0)
 }
-
 
 pub struct SignatureEntry {
     pub tenant_id: String,
@@ -485,6 +484,29 @@ pub async fn add_signature(
     signed_by: &str,
     signature: String,
 ) -> Result<bool, ServerError> {
+    if signed_by == tenant_id && signed_by == landlord_id {
+        let q = r#"
+            INSERT INTO signatures (
+                tenant_id, landlord_id, housing_id,
+                tenant_signature, landlord_signature
+            )
+            VALUES ($1,$2,$3,$4,$4)
+            ON CONFLICT (tenant_id, landlord_id, housing_id)
+            DO UPDATE SET
+                tenant_signature   = EXCLUDED.tenant_signature,
+                landlord_signature = EXCLUDED.landlord_signature
+        "#;
+        let result = sqlx::query(q)
+            .bind(tenant_id)
+            .bind(landlord_id)
+            .bind(housing_id)
+            .bind(&signature)
+            .execute(pool)
+            .await
+            .context("Failed to upsert both signatures")?;
+        return Ok(result.rows_affected() > 0);
+    }
+
     // Figure out which column to set
     let col_to_set = if signed_by == tenant_id {
         "tenant_signature"
