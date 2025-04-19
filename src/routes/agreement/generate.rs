@@ -131,7 +131,8 @@ pub async fn handler(
         .await;
 
     match result {
-        moka::ops::compute::CompResult::ReplacedWith(entry) => {
+        moka::ops::compute::CompResult::Inserted(entry)
+        | moka::ops::compute::CompResult::ReplacedWith(entry) => {
             let val = entry.value();
             if !(val.landlord_confirmed && val.tenant_confirmed) {
                 return Ok(Json(Response {}));
@@ -159,8 +160,7 @@ pub async fn handler(
         let document = typst::compile(&world)
             .output
             .map_err(|e| anyhow!("cannot compile Typst document {:?}", e))?;
-        Ok(typst_pdf::pdf(&document, &PdfOptions::default())
-            .expect("Error exporting PDF"))
+        Ok(typst_pdf::pdf(&document, &PdfOptions::default()).expect("Error exporting PDF"))
     })
     .await??;
 

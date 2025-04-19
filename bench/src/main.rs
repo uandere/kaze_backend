@@ -16,12 +16,17 @@
 //                    `idx,sign_ms,wait_signed_ms`     (signing)
 
 mod common;
+use std::thread::sleep;
+
 use anyhow::Result;
 use chrono::Duration;
 use common::Request;
 use csv::Writer;
+use futures::future::join_all;
+use http::header::AUTHORIZATION;
 use reqwest::Client;
-use tokio::time::{sleep, Instant};
+use tokio::time::Instant;
+use tracing::{error, info};
 
 /// where the backend listens
 const BASE: &str = "https://www.kazeapi.uk";
@@ -53,7 +58,7 @@ fn dump_signing(name: &str, sign: &[Duration], waits: &[Duration]) -> Result<()>
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = tracing_subscriber::fmt::try_init();
-    
+
     // prepare requests
     let common::Setup {
         sharing_requests,
@@ -70,7 +75,6 @@ async fn main() -> Result<()> {
     }
     dump_durations("sharing.csv", &sharing_durs)?;
 
-
     // ─────────────────────────────────────────────────────────────────────
     // 2.  /agreement/generate  (landlord ↔ landlord)
     // ─────────────────────────────────────────────────────────────────────
@@ -80,19 +84,31 @@ async fn main() -> Result<()> {
     }
     dump_durations("generate.csv", &generate_durs)?;
 
+    sleep(std::time::Duration::from_secs(5));
 
     // ─────────────────────────────────────────────────────────────────────
-    // 3.  /diia/signature  (+ wait for /agreement/get_signed)
+    // 3a. Fire off all /diia/signature requests in parallel
     // ─────────────────────────────────────────────────────────────────────
-    let mut sign_durs   = Vec::with_capacity(5);
-    let mut wait_durs   = Vec::with_capacity(5);
+    let mut sign_durs = Vec::with_capacity(5);
     let client = Client::new();
 
-    for (idx, req) in signing_requests.into_iter().enumerate() {
-        // POST /diia/signature
-        sign_durs.push(req.send(BASE).await?);
+    // collect futures
+    let sign_futs = signing_requests
+        .into_iter()
+        .map(|req| req.send(BASE))
+        .collect::<Vec<_>>();
 
-        // then poll /agreement/get_signed until 200
+    // race them all
+    let results = join_all(sign_futs).await;
+    for res in results {
+        sign_durs.push(res?);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 3b. Now poll /agreement/get_signed for each in turn
+    // ─────────────────────────────────────────────────────────────────────
+    let mut wait_durs = Vec::with_capacity(sign_durs.len());
+    for idx in 0..sign_durs.len() {
         let url = format!(
             "{BASE}/agreement/get_signed?tenant_id=landlord{0}&landlord_id=landlord{0}\
              &housing_id=housing1&_uid=landlord{0}",
@@ -101,14 +117,33 @@ async fn main() -> Result<()> {
 
         let start = Instant::now();
         loop {
-            let resp = client.get(&url).send().await?;
-            if resp.status().is_success() {
+            let resp = client
+                .get(&url)
+                .header(AUTHORIZATION, "Bearer dummy_token")
+                .send()
+                .await?;
+
+            let status = resp.status();
+            if status.is_success() {
+                info!("GET {} -> {} OK", url, status);
                 break;
             }
-            sleep(std::time::Duration::from_millis(200)).await;
+
+            // read the error body (assuming it's text)
+            let text = resp
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read body: {}>", e));
+
+            error!("GET {} -> {} error, body:\n{}", url, status, text);
+
+            if status.is_success() {
+                break;
+            }
         }
         wait_durs.push(common::to_chrono(start.elapsed()));
     }
+
     dump_signing("signing.csv", &sign_durs, &wait_durs)?;
 
     Ok(())

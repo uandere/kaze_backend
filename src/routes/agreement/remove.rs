@@ -93,8 +93,6 @@ pub async fn handler(
     }).await;
 
     // 4) remove from S3
-    //    We'll remove BOTH the .pdf object and the .p7s signature object
-    //    by calling `delete_object` on each key.  We'll do it "best-effort".
     let pdf_key = get_key_for_s3(Arc::new(AgreementProposalKey {
         tenant_id: payload.tenant_id.clone(),
         landlord_id: payload.landlord_id.clone(),
