@@ -54,8 +54,6 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
 
         let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
         finalize_fn();
-
-        EUUnload();
     }
 
     // Saving the cache into the file for now
