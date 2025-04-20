@@ -484,6 +484,7 @@ pub async fn add_signature(
     signed_by: &str,
     signature: String,
 ) -> Result<bool, ServerError> {
+    // TODO: remove this ===================================
     if signed_by == tenant_id && signed_by == landlord_id {
         let q = r#"
             INSERT INTO signatures (
@@ -506,6 +507,7 @@ pub async fn add_signature(
             .context("Failed to upsert both signatures")?;
         return Ok(result.rows_affected() > 0);
     }
+    // TODO: remove this ===================================
 
     // Figure out which column to set
     let col_to_set = if signed_by == tenant_id {

@@ -1,7 +1,10 @@
 use std::{ptr::null_mut, sync::Arc};
 
 use anyhow::anyhow;
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -105,9 +108,17 @@ pub async fn handler(
         )
         .into());
     }
-    
+
     // checking whether users confirmed the generation
-    match state.cache.get(&AgreementProposalKey { tenant_id: payload.tenant_id.clone(), landlord_id: payload.landlord_id.clone(), housing_id: payload.housing_id.clone() }).await {
+    match state
+        .cache
+        .get(&AgreementProposalKey {
+            tenant_id: payload.tenant_id.clone(),
+            landlord_id: payload.landlord_id.clone(),
+            housing_id: payload.housing_id.clone(),
+        })
+        .await
+    {
         Some(entry) => {
             if !(entry.landlord_confirmed && entry.tenant_confirmed) {
                 return Err(anyhow!(
@@ -115,14 +126,14 @@ pub async fn handler(
                 )
                 .into());
             }
-        },
+        }
         None => {
             return Err(anyhow!(
                 "cannot get a sign link: either tenant or a landlord didn't confirm the generation"
             )
             .into());
-        },
-    } 
+        }
+    }
 
     // getting the file to generate signed hash
     let mut pdf = get_agreement_pdf(
@@ -144,7 +155,7 @@ pub async fn handler(
 
         let ctx_hash_data_func = (*G_P_IFACE)
             .CtxHashData
-            .ok_or(anyhow!("couldn't get the hashing function from EUSign"))?;
+            .ok_or(anyhow!("EUSign missing CtxHashData"))?;
 
         let error_code = ctx_hash_data_func(
             state.ctx.lib_ctx as *mut std::ffi::c_void,
@@ -161,7 +172,17 @@ pub async fn handler(
             return Err(EUSignError(error_code).into());
         }
 
-        hash_string = String::from_raw_parts(hash, hash_len.try_into()?, hash_len.try_into()?);
+        let slice = std::slice::from_raw_parts(hash, hash_len.try_into()?);
+        hash_string = String::from_utf8(slice.to_owned())?;
+
+        let ctx_free_memory = (*G_P_IFACE)
+            .CtxFreeMemory
+            .ok_or(anyhow!("EUSign missing CtxFreeMemory"))?;
+
+        ctx_free_memory(
+            state.ctx.lib_ctx as *mut std::ffi::c_void,
+            hash,
+        );
     }
 
     // encoding hash to base64

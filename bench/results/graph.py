@@ -45,8 +45,8 @@ def main():
     x = np.arange(len(request_types))
     plt.bar(x, means, yerr=stds, capsize=5)
     plt.xticks(x, request_types)
-    plt.ylabel("Value")
-    plt.title("Mean and Standard Deviation per Request Type (30 samples)")
+    plt.ylabel("Time (ms)")
+    plt.title("Mean and Standard Deviation of Time per Request Type (30 samples)")
     plt.tight_layout()
     plt.show()
 
