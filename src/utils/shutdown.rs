@@ -8,7 +8,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT},
-        eusign::{EUUnload, G_P_IFACE},
+        eusign::G_P_IFACE,
     },
 };
 
