@@ -28,6 +28,13 @@ use reqwest::Client;
 use tokio::time::Instant;
 use tracing::{error, info};
 
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct StatusResponse {
+    status: String,
+}
+
 /// where the backend listens
 const BASE: &str = "https://www.kazeapi.uk";
 
@@ -108,41 +115,39 @@ async fn main() -> Result<()> {
     // 3b. Now poll /agreement/get_signed for each in turn
     // ─────────────────────────────────────────────────────────────────────
     let mut wait_durs = Vec::with_capacity(sign_durs.len());
-    for idx in 0..sign_durs.len() {
-        let url = format!(
-            "{BASE}/agreement/get_signed?tenant_id=landlord{0}&landlord_id=landlord{0}\
-             &housing_id=housing1&_uid=landlord{0}",
-            idx + 1
-        );
+for idx in 0..sign_durs.len() {
+    // build the URL exactly as your status endpoint expects
+    let url = format!(
+        "{BASE}/agreement/status?tenant_id=landlord{0}&landlord_id=landlord{0}\
+         &housing_id=housing1&_uid=landlord{0}",
+        idx + 1
+    );
 
-        let start = Instant::now();
-        loop {
-            let resp = client
-                .get(&url)
-                .header(AUTHORIZATION, "Bearer dummy_token")
-                .send()
-                .await?;
+    let start = Instant::now();
+    loop {
+        let resp = client
+            .get(&url)
+            .header(AUTHORIZATION, "Bearer dummy_token")
+            .send()
+            .await?;
 
-            let status = resp.status();
-            if status.is_success() {
-                info!("GET {} -> {} OK", url, status);
+        let status = resp.status();
+
+        if status.is_success() {
+            let body: StatusResponse = resp.json().await?;
+            if body.status == "Signed" {
+                info!("GET {} -> Signed", url);
                 break;
             }
-
-            // read the error body (assuming it's text)
-            let text = resp
-                .text()
-                .await
-                .unwrap_or_else(|e| format!("<failed to read body: {}>", e));
-
+        } else {
+            let text = resp.text().await.unwrap_or_default();
             error!("GET {} -> {} error, body:\n{}", url, status, text);
-
-            if status.is_success() {
-                break;
-            }
         }
-        wait_durs.push(common::to_chrono(start.elapsed()));
     }
+
+    wait_durs.push(common::to_chrono(start.elapsed()));
+}
+
 
     dump_signing("signing.csv", &sign_durs, &wait_durs)?;
 
