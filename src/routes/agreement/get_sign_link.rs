@@ -146,41 +146,46 @@ pub async fn handler(
     .await?;
 
     // generating the hash
-    let base64_hash = unsafe {
-        // 1) allocate pointers
-        let mut p_hash = null_mut();
+    let hash_string;
+
+    unsafe {
+        let mut hash = std::ptr::null_mut();
         let mut hash_len = 0;
-    
-        // 2) call the C hash
-        let hash_fn = (*G_P_IFACE).CtxHashData
-            .ok_or(anyhow!("couldn't get the CtxHashData function from EUSign"))?;
-        let err = hash_fn(
-            state.ctx.lib_ctx as *mut _,
+
+        let ctx_hash_data_func = (*G_P_IFACE)
+            .CtxHashData
+            .ok_or(anyhow!("EUSign missing CtxHashData"))?;
+
+        let error_code = ctx_hash_data_func(
+            state.ctx.lib_ctx as *mut std::ffi::c_void,
             EU_CTX_HASH_ALGO_SHA256.into(),
             null_mut(),
             0,
             pdf.as_mut_ptr(),
             pdf.len().try_into()?,
-            &mut p_hash,
+            &mut hash,
             &mut hash_len,
         );
-        if err != EU_ERROR_NONE as u64 {
-            return Err(EUSignError(err).into());
+
+        if error_code as u32 != EU_ERROR_NONE {
+            return Err(EUSignError(error_code).into());
         }
-    
-        // 3) copy into a Rust Vec<u8>
-        let hash_slice = std::slice::from_raw_parts(p_hash, hash_len as usize);
-        let hash_bytes = hash_slice.to_vec();
-    
-        // 4) free the C buffer with the proper call
-        let free_fn = (*G_P_IFACE).CtxFreeMemory
-            .ok_or(anyhow!("couldn't get the CtxFreeMemory function from EUSign"))?;
-        free_fn(state.ctx.lib_ctx as *mut _, p_hash);
-    
-        // 5) base64‑encode your Rust buffer
-        STANDARD.encode(&hash_bytes)
-    };
-    
+
+        let slice = std::slice::from_raw_parts(hash, hash_len.try_into()?);
+        hash_string = String::from_utf8(slice.to_owned())?;
+
+        let ctx_free_memory = (*G_P_IFACE)
+            .CtxFreeMemory
+            .ok_or(anyhow!("EUSign missing CtxFreeMemory"))?;
+
+        ctx_free_memory(
+            state.ctx.lib_ctx as *mut std::ffi::c_void,
+            hash,
+        );
+    }
+
+    // encoding hash to base64
+    let base64_hash = STANDARD.encode(hash_string);
 
     let request_id = SignHashRequestId {
         tenant_id: payload.tenant_id,

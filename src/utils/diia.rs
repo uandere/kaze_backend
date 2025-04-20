@@ -1,5 +1,5 @@
 use std::{
-    ffi::c_void,
+    ffi::c_ulong,
     ptr::{self},
     sync::Arc,
 };
@@ -70,7 +70,7 @@ pub async fn diia_signature_handler(
         landlord_signature,
     }: SignatureEntry,
 ) -> Result<(), ServerError> {
-    // 1) Grab the latest PDF from S3:
+    // 1) fetch the PDF
     let mut pdf = get_agreement_pdf(
         &state,
         Arc::new(AgreementProposalKey {
@@ -80,126 +80,141 @@ pub async fn diia_signature_handler(
         }),
     )
     .await?;
-
-    // We'll be passing a pointer to EUSign's FFI:
     let pdf_data = pdf.as_mut_ptr();
 
-    // Decode tenant signature from Base64 (must exist).
+    // 2) decode both Base64 blobs
     let mut tenant_sig_bytes = BASE64_STANDARD
         .decode(&tenant_signature)
-        .context("unable to decode base64 tenant signature")?;
-
-    // If there's a landlord signature, decode it too.
+        .context("unable to decode tenant signature")?;
     let mut landlord_sig_bytes = BASE64_STANDARD
         .decode(&landlord_signature)
-        .context("unable to decode base64 landlord signature")?;
+        .context("unable to decode landlord signature")?;
 
-    // 2) Prepare function pointers from EUSign’s global interface:
     unsafe {
-        let ctx_get_signer_info = (*G_P_IFACE)
-            .CtxGetSignerInfo
-            .context("EUSign missing CtxGetSignerInfo")?;
-        let ctx_create_empty_sign = (*G_P_IFACE)
-            .CtxCreateEmptySign
-            .context("EUSign missing CtxCreateEmptySign")?;
-        let get_signer = (*G_P_IFACE).GetSigner.context("EUSign missing GetSigner")?;
-        let get_sign_type = (*G_P_IFACE)
-            .GetSignType
-            .context("EUSign missing GetSignType")?;
-        let ctx_append_signer = (*G_P_IFACE)
-            .CtxAppendSigner
-            .context("EUSign missing CtxAppendSigner")?;
+        // 3) grab all the EUSign entry points
+        let ctx_get_signer_info = (*G_P_IFACE).CtxGetSignerInfo.unwrap();
+        let ctx_create_empty_sign = (*G_P_IFACE).CtxCreateEmptySign.unwrap();
+        let get_signer = (*G_P_IFACE).GetSigner.unwrap();
+        let get_sign_type = (*G_P_IFACE).GetSignType.unwrap();
+        let ctx_append_signer = (*G_P_IFACE).CtxAppendSigner.unwrap();
 
-        // 3) Extract the tenant’s certificate from the raw tenant signature.
-        info!("---Tenant phase---");
+        // frees raw buffers
+        let ctx_free_memory = (*G_P_IFACE).CtxFreeMemory.unwrap();
+        // frees the EU_CERT_INFO_EX struct
+        let ctx_free_cert_ex = (*G_P_IFACE).CtxFreeCertificateInfoEx.unwrap();
+
+        // ---- Tenant phase ----
+
+        // a) pull out certificate‐info + raw certificate
         let mut tenant_cert_info = ptr::null_mut();
         let mut tenant_cert = ptr::null_mut();
         let mut tenant_cert_len = 0;
-        let mut err = ctx_get_signer_info(
-            state.ctx.lib_ctx as *mut c_void,
-            0, // sign index
+        let err = ctx_get_signer_info(
+            state.ctx.lib_ctx as *mut _,
+            0, // signer index
             tenant_sig_bytes.as_mut_ptr(),
             tenant_sig_bytes.len().try_into()?,
             &mut tenant_cert_info,
             &mut tenant_cert,
             &mut tenant_cert_len,
         );
-        if err as u32 != EU_ERROR_NONE {
+        if err != EU_ERROR_NONE as c_ulong {
             return Err(EUSignError(err).into());
         }
 
-        // 4) Create an “empty” sign container with the PDF + tenant cert.
-        let mut signature = ptr::null_mut();
-        let mut signature_len = 0;
+        // b) extract the raw signer‐info blob
+        let mut tenant_info = ptr::null_mut();
+        let mut tenant_info_len = 0;
+        let err = get_signer(
+            0,
+            ptr::null_mut(),
+            tenant_sig_bytes.as_mut_ptr(),
+            tenant_sig_bytes.len().try_into()?,
+            ptr::null_mut(),
+            &mut tenant_info,
+            &mut tenant_info_len,
+        );
+        if err != EU_ERROR_NONE as c_ulong {
+            // cleanup the cert we just got
+            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+            return Err(EUSignError(err).into());
+        }
 
-        err = ctx_create_empty_sign(
-            state.ctx.lib_ctx as *mut c_void,
+        // optional: log sign‐type
+        {
+            let mut ttype = 0;
+            let _ = get_sign_type(
+                0,
+                ptr::null_mut(),
+                tenant_sig_bytes.as_mut_ptr(),
+                tenant_sig_bytes.len().try_into()?,
+                &mut ttype,
+            );
+            info!("Tenant signature type: {}", ttype);
+        }
+
+        // c) make an “empty” CAdES container
+        let mut signature0 = ptr::null_mut();
+        let mut signature0_len = 0;
+        let err = ctx_create_empty_sign(
+            state.ctx.lib_ctx as *mut _,
             EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
             pdf_data,
             pdf.len().try_into()?,
             tenant_cert,
             tenant_cert_len,
-            &mut signature,
-            &mut signature_len,
+            &mut signature0,
+            &mut signature0_len,
         );
-        if err as u32 != EU_ERROR_NONE {
+        if err != EU_ERROR_NONE as c_ulong {
+            // cleanup everything from tenant phase
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
+            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
             return Err(EUSignError(err).into());
         }
 
-        // 5) Convert the tenant’s raw signature blob into “signer info”:
-        let mut tenant_info = ptr::null_mut();
-        let mut tenant_info_len = 0;
-        err = get_signer(
-            0,               // sign index
-            ptr::null_mut(), // if we had a Base64 string, we’d pass it in here
-            tenant_sig_bytes.as_mut_ptr(),
-            tenant_sig_bytes.len().try_into()?,
-            ptr::null_mut(),  // out param for base64 signer
-            &mut tenant_info, // out param for raw byte-signer
-            &mut tenant_info_len,
-        );
-        if err as u32 != EU_ERROR_NONE {
-            return Err(EUSignError(err).into());
-        }
-
-        // Check the sign type (optional debugging):
-        let mut tenant_sign_type = 0;
-        err = get_sign_type(
-            0,
-            ptr::null_mut(),
-            tenant_sig_bytes.as_mut_ptr(),
-            tenant_sig_bytes.len().try_into()?,
-            &mut tenant_sign_type,
-        );
-        if err as u32 != EU_ERROR_NONE {
-            return Err(EUSignError(err).into());
-        }
-        info!("Tenant signature type code: {}", tenant_sign_type);
-
-        // 6) Append the tenant signer onto that container:
-        err = ctx_append_signer(
-            state.ctx.lib_ctx as *mut c_void,
+        // d) append the tenant signer
+        let mut signature1 = ptr::null_mut();
+        let mut signature1_len = 0;
+        let err = ctx_append_signer(
+            state.ctx.lib_ctx as *mut _,
             EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
             tenant_info,
             tenant_info_len,
             tenant_cert,
             tenant_cert_len,
-            signature,
-            signature_len,
-            &mut signature,
-            &mut signature_len,
+            signature0,
+            signature0_len,
+            &mut signature1,
+            &mut signature1_len,
         );
-        if err as u32 != EU_ERROR_NONE {
+        if err != EU_ERROR_NONE as c_ulong {
+            // cleanup the empty container + tenant info
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, signature0 as *mut _);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
+            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
             return Err(EUSignError(err).into());
         }
 
-        // 7) If the landlord’s signature is present, do the same “append” again.
-            info!("---Landlord phase---");
+        // free intermediate buffers from tenant phase
+        ctx_free_memory(state.ctx.lib_ctx as *mut _, signature0 as *mut _);
+        ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
+        ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
+        ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+
+        // ---- Landlord phase (optional) ----
+        let (final_ptr, final_len) = if !landlord_sig_bytes.is_empty() {
+            info!("--- Landlord phase ---");
+
+            // a) get landlord's cert + info
             let mut landlord_cert_info = ptr::null_mut();
             let mut landlord_cert = ptr::null_mut();
             let mut landlord_cert_len = 0;
-            err = ctx_get_signer_info(
-                state.ctx.lib_ctx as *mut c_void,
+            let err = ctx_get_signer_info(
+                state.ctx.lib_ctx as *mut _,
                 0,
                 landlord_sig_bytes.as_mut_ptr(),
                 landlord_sig_bytes.len().try_into()?,
@@ -207,13 +222,15 @@ pub async fn diia_signature_handler(
                 &mut landlord_cert,
                 &mut landlord_cert_len,
             );
-            if err as u32 != EU_ERROR_NONE {
+            if err != EU_ERROR_NONE as c_ulong {
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
                 return Err(EUSignError(err).into());
             }
 
+            // b) pull out raw signer info
             let mut landlord_info = ptr::null_mut();
             let mut landlord_info_len = 0;
-            err = get_signer(
+            let err = get_signer(
                 0,
                 ptr::null_mut(),
                 landlord_sig_bytes.as_mut_ptr(),
@@ -222,50 +239,71 @@ pub async fn diia_signature_handler(
                 &mut landlord_info,
                 &mut landlord_info_len,
             );
-            if err as u32 != EU_ERROR_NONE {
+            if err != EU_ERROR_NONE as c_ulong {
+                ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
                 return Err(EUSignError(err).into());
             }
 
-            // optional debug
-            let mut landlord_sign_type = 0;
-            err = get_sign_type(
-                0,
-                ptr::null_mut(),
-                landlord_sig_bytes.as_mut_ptr(),
-                landlord_sig_bytes.len().try_into()?,
-                &mut landlord_sign_type,
-            );
-            if err as u32 != EU_ERROR_NONE {
-                return Err(EUSignError(err).into());
+            // optional debug landlord sign type
+            {
+                let mut ltype = 0;
+                let _ = get_sign_type(
+                    0,
+                    ptr::null_mut(),
+                    landlord_sig_bytes.as_mut_ptr(),
+                    landlord_sig_bytes.len().try_into()?,
+                    &mut ltype,
+                );
+                info!("Landlord signature type: {}", ltype);
             }
-            info!("Landlord signature type code: {}", landlord_sign_type);
 
-            // Append the landlord signer to the existing container:
-            err = ctx_append_signer(
-                state.ctx.lib_ctx as *mut c_void,
+            // c) append landlord onto the existing container
+            let mut signature2 = ptr::null_mut();
+            let mut signature2_len = 0;
+            let err = ctx_append_signer(
+                state.ctx.lib_ctx as *mut _,
                 EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
                 landlord_info,
                 landlord_info_len,
                 landlord_cert,
                 landlord_cert_len,
-                signature, // pass the container that already has the tenant
-                signature_len,
-                &mut signature, // updated container
-                &mut signature_len,
+                signature1,
+                signature1_len,
+                &mut signature2,
+                &mut signature2_len,
             );
-            if err as u32 != EU_ERROR_NONE {
+            if err != EU_ERROR_NONE as c_ulong {
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_info as *mut _);
+                ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
+                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
                 return Err(EUSignError(err).into());
             }
 
-        // 8) Now `signature` is a container with 1 or 2 signers. Upload it:
+            // free the old container + landlord metadata
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_info as *mut _);
+            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
+            ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
+
+            (signature2, signature2_len)
+        } else {
+            // no landlord sig → this is final
+            (signature1, signature1_len)
+        };
+
+        // 4) move it into a Rust Vec<u8>
+        let out = std::slice::from_raw_parts(final_ptr, final_len as usize).to_vec();
+
+        // 5) free the last C++ buffer
+        ctx_free_memory(state.ctx.lib_ctx as *mut _, final_ptr as *mut _);
+
+        // 6) upload
         upload_agreement_p7s(
             &state,
-            // we must reconstruct a Vec<u8> from the raw pointer, so ownership can be moved.
-            Vec::from_raw_parts(
-                signature,
-                signature_len.try_into()?,
-                signature_len.try_into()?,
-            ),
+            out,
             Arc::new(AgreementProposalKey {
                 tenant_id,
                 landlord_id,
