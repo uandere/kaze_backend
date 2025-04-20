@@ -45,7 +45,6 @@ pub struct RemoveAgreementResponse {
 ///
 /// If the request is made by either `tenant_id` or `landlord_id`,
 /// we proceed with removal. Otherwise, we fail.
-#[axum::debug_handler]
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
