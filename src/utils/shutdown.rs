@@ -8,7 +8,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT},
-        eusign::G_P_IFACE,
+        eusign::{EUUnload, G_P_IFACE},
     },
 };
 
@@ -52,8 +52,7 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
             .expect("wasn't able to free the library context");
         ctx_free(state.ctx.lib_ctx as *mut c_void);
 
-        let finalize_fn = (*G_P_IFACE).Finalize.unwrap();
-        finalize_fn();
+        EUUnload();
     }
 
     // Saving the cache into the file for now
