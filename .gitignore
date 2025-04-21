@@ -9,4 +9,4 @@ CA-*.p7b
 libs/eusign/pkey
 libs/eusign/certificates
 mockup_users
-checkpoint/cache.json
+checkpoint/*
