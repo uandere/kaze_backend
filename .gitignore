@@ -10,3 +10,4 @@ libs/eusign/pkey
 libs/eusign/certificates
 mockup_users
 checkpoint/cache.json
+deploy/valgrind-memcheck.log

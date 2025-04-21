@@ -15,6 +15,7 @@ Environment="LD_LIBRARY_PATH=/home/ssm-user/kaze_backend/libs/eusign/shared:/usr
 ExecStart=/snap/bin/valgrind \
   --leak-check=full \
   --show-leak-kinds=all \
+  --suppressions=/home/ssm-user/kaze_backend/valgrind.supp
   --log-file=/home/ssm-user/kaze_backend/deploy/valgrind-memcheck.log \
   /home/ssm-user/kaze_backend/target/debug/kaze_backend \
     server --https-port 8080
