@@ -17,7 +17,7 @@ use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::ffi::{c_char, c_ulong, CString};
+use std::ffi::{c_char, CString};
 use std::net::{SocketAddr, TcpListener};
 use std::ptr;
 use std::sync::Arc;
@@ -142,14 +142,6 @@ pub fn run(
                 return Err(EUSignError(error_code).into());
             }
 
-            // 2) Get the interface pointer
-            let p_iface = EUGetInterface();
-            if p_iface.is_null() {
-                EUUnload();
-                return Err(EUSignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
-            }
-            G_P_IFACE = p_iface;
-
             let encryption_cert_path =
                 config.eusign.sz_path.clone() + &config.eusign.encryption_cert_file_name;
             let signature_cert_path =
@@ -158,15 +150,13 @@ pub fn run(
             encryption_cert = read_file_to_base64(&encryption_cert_path)?;
             signature_cert = read_file_to_base64(&signature_cert_path)?;
 
-            // Creating library context
+            // Initializing the library
             Initialize(config.clone())?;
-
-            let read_private_key_file = (*G_P_IFACE).ReadPrivateKeyFile.unwrap();
 
             let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
             let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
 
-            let error_code = read_private_key_file(
+            let error_code = EUReadPrivateKeyFile(
                 c_key_path.as_ptr() as *mut c_char,
                 c_key_pwd.as_ptr() as *mut c_char,
                 cert_info,

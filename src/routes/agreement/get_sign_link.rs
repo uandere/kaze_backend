@@ -22,7 +22,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::AgreementProposalKey,
-        eusign::{EU_ERROR_NONE, G_P_IFACE},
+        eusign::*,
         s3::get_agreement_pdf,
         server_error::{EUSignError, ServerError},
         verify_jwt::verify_jwt,
@@ -151,11 +151,8 @@ pub async fn handler(
             // 1) Call into EUSign to get a new[]‐allocated buffer + length
             let mut hash = std::ptr::null_mut();
             let mut hash_len = 0;
-    
-            let hash_data = (*G_P_IFACE)
-                .HashData
-                .ok_or(anyhow!("EUSign missing CtxHashData"))?;
-            let err = hash_data(
+
+            let err = EUHashData(
                 pdf.as_mut_ptr(),
                 pdf.len().try_into()?,
                 null_mut(),
@@ -165,22 +162,18 @@ pub async fn handler(
             if err as u32 != EU_ERROR_NONE {
                 return Err(EUSignError(err).into());
             }
-    
+
             // 2) Copy into a Rust Vec<u8>
             let slice = std::slice::from_raw_parts(hash, hash_len as usize);
             let rust_bytes = slice.to_vec();
-    
+
             // 3) Free the C++ buffer with the proper free call
-            let free_memory = (*G_P_IFACE)
-                .FreeMemory
-                .ok_or(anyhow!("EUSign missing CtxFreeMemory"))?;
-            free_memory(hash);
-    
+            EUFreeMemory(hash);
+
             // 4) Base64‑encode and return
             STANDARD.encode(&rust_bytes)
         }
     };
-    
 
     let request_id = SignHashRequestId {
         tenant_id: payload.tenant_id,
