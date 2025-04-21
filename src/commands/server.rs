@@ -17,7 +17,7 @@ use rs_firebase_admin_sdk::auth::token::LiveTokenVerifier;
 use rs_firebase_admin_sdk::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::ffi::{c_char, c_ulong, c_void, CString};
+use std::ffi::{c_char, CString};
 use std::net::{SocketAddr, TcpListener};
 use std::ptr;
 use std::sync::Arc;
@@ -133,8 +133,7 @@ pub fn run(
         // A code to load the EUSign library
         let encryption_cert;
         let signature_cert;
-        let lib_ctx: *mut c_void;
-        let mut key_ctx: *mut c_void = ptr::null_mut();
+        let cert_info = ptr::null_mut();
 
         unsafe {
             let error_code = EULoad();
@@ -142,14 +141,6 @@ pub fn run(
                 // Means it failed
                 return Err(EUSignError(error_code).into());
             }
-
-            // 2) Get the interface pointer
-            let p_iface = EUGetInterface();
-            if p_iface.is_null() {
-                EUUnload();
-                return Err(EUSignError(EU_ERROR_LIBRARY_LOAD as c_ulong).into());
-            }
-            G_P_IFACE = p_iface;
 
             let encryption_cert_path =
                 config.eusign.sz_path.clone() + &config.eusign.encryption_cert_file_name;
@@ -159,20 +150,16 @@ pub fn run(
             encryption_cert = read_file_to_base64(&encryption_cert_path)?;
             signature_cert = read_file_to_base64(&signature_cert_path)?;
 
-            // Creating library context
-            lib_ctx = Initialize(config.clone())?;
-
-            let ctx_read_private_key_file = (*G_P_IFACE).CtxReadPrivateKeyFile.unwrap();
+            // Initializing the library
+            Initialize(config.clone())?;
 
             let c_key_path = CString::new(config.eusign.private_key_path.clone())?;
             let c_key_pwd = CString::new(config.eusign.private_key_password.clone())?;
 
-            let error_code = ctx_read_private_key_file(
-                lib_ctx,
+            let error_code = EUReadPrivateKeyFile(
                 c_key_path.as_ptr() as *mut c_char,
                 c_key_pwd.as_ptr() as *mut c_char,
-                &mut key_ctx,
-                ptr::null_mut(),
+                cert_info,
             );
 
             if error_code as u32 != EU_ERROR_NONE {
@@ -201,7 +188,6 @@ pub fn run(
             config: Arc::new(config),
             encryption_cert: Arc::new(encryption_cert),
             signature_cert: Arc::new(signature_cert),
-            ctx: Arc::new(EusignContext { lib_ctx, key_ctx }),
             cache,
             db_pool,
             agreement_template_string,
@@ -263,14 +249,8 @@ pub fn run(
                 "/user/get_sharing_link",
                 get(crate::routes::user::get_sharing_link::handler),
             )
-            .route(
-                "/user/name",
-                get(crate::routes::user::name::handler),
-            )
-            .route(
-                "/user/remove",
-                delete(crate::routes::user::remove::handler),
-            )
+            .route("/user/name", get(crate::routes::user::name::handler))
+            .route("/user/remove", delete(crate::routes::user::remove::handler))
             .route(
                 "/agreement/generate",
                 post(crate::routes::agreement::generate::handler),
@@ -326,8 +306,6 @@ pub struct ServerState {
     pub signature_cert: Arc<String>,
     /// A base64-encoded certificate for encryption/decryption
     pub encryption_cert: Arc<String>,
-    /// A pointer to the context of the library
-    pub ctx: Arc<EusignContext>,
     /// A cache of agreement proposals
     pub cache: AgreementProposalCache,
     /// The database connection pool

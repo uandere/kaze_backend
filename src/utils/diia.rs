@@ -1,6 +1,6 @@
 use std::{
     ffi::c_ulong,
-    ptr::{self},
+    ptr::{self, null_mut},
     sync::Arc,
 };
 
@@ -16,7 +16,7 @@ use tracing::info;
 use super::{
     cache::AgreementProposalKey,
     db::SignatureEntry,
-    eusign::{EU_CTX_SIGN_ECDSA_WITH_SHA, EU_ERROR_NONE, G_P_IFACE},
+    eusign::*,
     s3::{get_agreement_pdf, upload_agreement_p7s},
     server_error::{EUSignError, ServerError},
 };
@@ -91,27 +91,15 @@ pub async fn diia_signature_handler(
         .context("unable to decode landlord signature")?;
 
     unsafe {
-        // 3) grab all the EUSign entry points
-        let ctx_get_signer_info = (*G_P_IFACE).CtxGetSignerInfo.unwrap();
-        let ctx_create_empty_sign = (*G_P_IFACE).CtxCreateEmptySign.unwrap();
-        let get_signer = (*G_P_IFACE).GetSigner.unwrap();
-        let get_sign_type = (*G_P_IFACE).GetSignType.unwrap();
-        let ctx_append_signer = (*G_P_IFACE).CtxAppendSigner.unwrap();
-
-        // frees raw buffers
-        let ctx_free_memory = (*G_P_IFACE).CtxFreeMemory.unwrap();
-        // frees the EU_CERT_INFO_EX struct
-        let ctx_free_cert_ex = (*G_P_IFACE).CtxFreeCertificateInfoEx.unwrap();
-
         // ---- Tenant phase ----
 
         // a) pull out certificate‐info + raw certificate
         let mut tenant_cert_info = ptr::null_mut();
         let mut tenant_cert = ptr::null_mut();
         let mut tenant_cert_len = 0;
-        let err = ctx_get_signer_info(
-            state.ctx.lib_ctx as *mut _,
-            0, // signer index
+        let err = EUGetSignerInfo(
+            0,
+            null_mut(),
             tenant_sig_bytes.as_mut_ptr(),
             tenant_sig_bytes.len().try_into()?,
             &mut tenant_cert_info,
@@ -125,7 +113,7 @@ pub async fn diia_signature_handler(
         // b) extract the raw signer‐info blob
         let mut tenant_info = ptr::null_mut();
         let mut tenant_info_len = 0;
-        let err = get_signer(
+        let err = EUGetSigner(
             0,
             ptr::null_mut(),
             tenant_sig_bytes.as_mut_ptr(),
@@ -136,15 +124,15 @@ pub async fn diia_signature_handler(
         );
         if err != EU_ERROR_NONE as c_ulong {
             // cleanup the cert we just got
-            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+            EUFreeCertificateInfoEx(tenant_cert_info);
+            EUFreeMemory(tenant_cert);
             return Err(EUSignError(err).into());
         }
 
         // optional: log sign‐type
         {
             let mut ttype = 0;
-            let _ = get_sign_type(
+            let _ = EUGetSignType(
                 0,
                 ptr::null_mut(),
                 tenant_sig_bytes.as_mut_ptr(),
@@ -157,53 +145,54 @@ pub async fn diia_signature_handler(
         // c) make an “empty” CAdES container
         let mut signature0 = ptr::null_mut();
         let mut signature0_len = 0;
-        let err = ctx_create_empty_sign(
-            state.ctx.lib_ctx as *mut _,
-            EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
+        let err = EUCreateEmptySign(
             pdf_data,
             pdf.len().try_into()?,
-            tenant_cert,
-            tenant_cert_len,
+            // EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
+            // tenant_cert,
+            // tenant_cert_len,
+            null_mut(),
             &mut signature0,
             &mut signature0_len,
         );
         if err != EU_ERROR_NONE as c_ulong {
             // cleanup everything from tenant phase
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
-            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+            EUFreeMemory(tenant_info);
+            EUFreeCertificateInfoEx(tenant_cert_info);
+            EUFreeMemory(tenant_cert);
             return Err(EUSignError(err).into());
         }
 
         // d) append the tenant signer
         let mut signature1 = ptr::null_mut();
         let mut signature1_len = 0;
-        let err = ctx_append_signer(
-            state.ctx.lib_ctx as *mut _,
-            EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
+        let err = EUAppendSigner(
+            null_mut(),
             tenant_info,
             tenant_info_len,
             tenant_cert,
             tenant_cert_len,
+            null_mut(),
             signature0,
             signature0_len,
+            null_mut(),
             &mut signature1,
             &mut signature1_len,
         );
         if err != EU_ERROR_NONE as c_ulong {
             // cleanup the empty container + tenant info
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, signature0 as *mut _);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
-            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+            EUFreeMemory(signature0);
+            EUFreeMemory(tenant_info);
+            EUFreeCertificateInfoEx(tenant_cert_info);
+            EUFreeMemory(tenant_cert);
             return Err(EUSignError(err).into());
         }
 
         // free intermediate buffers from tenant phase
-        ctx_free_memory(state.ctx.lib_ctx as *mut _, signature0 as *mut _);
-        ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_info as *mut _);
-        ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, tenant_cert_info);
-        ctx_free_memory(state.ctx.lib_ctx as *mut _, tenant_cert as *mut _);
+        EUFreeMemory(signature0);
+        EUFreeMemory(tenant_info);
+        EUFreeCertificateInfoEx(tenant_cert_info);
+        EUFreeMemory(tenant_cert);
 
         // ---- Landlord phase (optional) ----
         let (final_ptr, final_len) = if !landlord_sig_bytes.is_empty() {
@@ -213,9 +202,9 @@ pub async fn diia_signature_handler(
             let mut landlord_cert_info = ptr::null_mut();
             let mut landlord_cert = ptr::null_mut();
             let mut landlord_cert_len = 0;
-            let err = ctx_get_signer_info(
-                state.ctx.lib_ctx as *mut _,
+            let err = EUGetSignerInfo(
                 0,
+                null_mut(),
                 landlord_sig_bytes.as_mut_ptr(),
                 landlord_sig_bytes.len().try_into()?,
                 &mut landlord_cert_info,
@@ -223,14 +212,14 @@ pub async fn diia_signature_handler(
                 &mut landlord_cert_len,
             );
             if err != EU_ERROR_NONE as c_ulong {
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
+                EUFreeMemory(signature1);
                 return Err(EUSignError(err).into());
             }
 
             // b) pull out raw signer info
             let mut landlord_info = ptr::null_mut();
             let mut landlord_info_len = 0;
-            let err = get_signer(
+            let err = EUGetSigner(
                 0,
                 ptr::null_mut(),
                 landlord_sig_bytes.as_mut_ptr(),
@@ -240,16 +229,16 @@ pub async fn diia_signature_handler(
                 &mut landlord_info_len,
             );
             if err != EU_ERROR_NONE as c_ulong {
-                ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
+                EUFreeCertificateInfoEx(landlord_cert_info);
+                EUFreeMemory(landlord_cert);
+                EUFreeMemory(signature1);
                 return Err(EUSignError(err).into());
             }
 
             // optional debug landlord sign type
             {
                 let mut ltype = 0;
-                let _ = get_sign_type(
+                let _ = EUGetSignType(
                     0,
                     ptr::null_mut(),
                     landlord_sig_bytes.as_mut_ptr(),
@@ -262,31 +251,32 @@ pub async fn diia_signature_handler(
             // c) append landlord onto the existing container
             let mut signature2 = ptr::null_mut();
             let mut signature2_len = 0;
-            let err = ctx_append_signer(
-                state.ctx.lib_ctx as *mut _,
-                EU_CTX_SIGN_ECDSA_WITH_SHA.into(),
+            let err = EUAppendSigner(
+                null_mut(),
                 landlord_info,
                 landlord_info_len,
                 landlord_cert,
                 landlord_cert_len,
+                null_mut(),
                 signature1,
                 signature1_len,
+                null_mut(),
                 &mut signature2,
                 &mut signature2_len,
             );
             if err != EU_ERROR_NONE as c_ulong {
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_info as *mut _);
-                ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
-                ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
+                EUFreeMemory(signature1);
+                EUFreeMemory(landlord_info);
+                EUFreeCertificateInfoEx(landlord_cert_info);
+                EUFreeMemory(landlord_cert);
                 return Err(EUSignError(err).into());
             }
 
             // free the old container + landlord metadata
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, signature1 as *mut _);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_info as *mut _);
-            ctx_free_cert_ex(state.ctx.lib_ctx as *mut _, landlord_cert_info);
-            ctx_free_memory(state.ctx.lib_ctx as *mut _, landlord_cert as *mut _);
+            EUFreeMemory(signature1);
+            EUFreeMemory(landlord_info);
+            EUFreeCertificateInfoEx(landlord_cert_info);
+            EUFreeMemory(landlord_cert);
 
             (signature2, signature2_len)
         } else {
@@ -298,7 +288,7 @@ pub async fn diia_signature_handler(
         let out = std::slice::from_raw_parts(final_ptr, final_len as usize).to_vec();
 
         // 5) free the last C++ buffer
-        ctx_free_memory(state.ctx.lib_ctx as *mut _, final_ptr as *mut _);
+        EUFreeMemory(final_ptr);
 
         // 6) upload
         upload_agreement_p7s(
