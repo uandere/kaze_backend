@@ -912,8 +912,8 @@ pub fn parse_cas(json: &str) -> Result<Vec<CASettings>, serde_json::Error> {
 // The "Initialize()" logic from example usage
 ///////////////////////////////////////////////////////////////////////////////
 /// # Safety
-pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EUSignError> {
-    let mut dwError: c_ulong;
+pub unsafe fn Initialize(config: Config) -> Result<(), EUSignError> {
+    let mut dwError;
 
     // If we are using the function-pointer interface, do:
     let set_ui_mode = (*G_P_IFACE).SetUIMode.unwrap();
@@ -1090,27 +1090,18 @@ pub unsafe fn Initialize(config: Config) -> Result<*mut c_void, EUSignError> {
     }
 
     // Load CA certificates:
-    {
-        let save_certificates = (*G_P_IFACE).SaveCertificates.unwrap();
-        let mut res = fs::read(&config.eusign.ca_certificates_path).unwrap();
-        if !res.is_empty() {
-            let dwError = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
-            if dwError != EU_ERROR_NONE as c_ulong {
-                return Err(EUSignError(dwError));
-            }
-        }
-    }
+    // {
+    //     let save_certificates = (*G_P_IFACE).SaveCertificates.unwrap();
+    //     let mut res = fs::read(&config.eusign.ca_certificates_path).unwrap();
+    //     if !res.is_empty() {
+    //         let dwError = save_certificates(res.as_mut_ptr(), res.len() as c_ulong);
+    //         if dwError != EU_ERROR_NONE as c_ulong {
+    //             return Err(EUSignError(dwError));
+    //         }
+    //     }
+    // }
 
-    // Create context
-    let ctx_create = (*G_P_IFACE).CtxCreate.unwrap();
-    let mut pvContext: *mut c_void = ptr::null_mut();
-    dwError = ctx_create(&mut pvContext as *mut _);
-    if dwError != EU_ERROR_NONE as c_ulong {
-        warn!("{}", get_error_message(dwError));
-        return Err(EUSignError(dwError));
-    }
-
-    Ok(pvContext)
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1121,8 +1112,8 @@ pub unsafe fn decrypt_customer_data(
     state: &ServerState,
     pszCustomerCrypto: &str,
 ) -> Result<String, EUSignError> {
-    let mut ppbCustomerData: *mut c_uchar = ptr::null_mut();
-    let mut pdwCustomerData: c_ulong = 0;
+    let mut ppbCustomerData = ptr::null_mut();
+    let mut pdwCustomerData = 0;
 
     let mut pSenderInfo = EU_ENVELOP_INFO::default();
     let mut pSignInfo = EU_SIGN_INFO::default();
@@ -1130,22 +1121,22 @@ pub unsafe fn decrypt_customer_data(
     // Because we do lots of calls, let's define closures for shorter usage:
     let base64_decode = (*G_P_IFACE).BASE64Decode.unwrap();
     let free_memory = (*G_P_IFACE).FreeMemory.unwrap();
-    let ctx_develop_data = (*G_P_IFACE).CtxDevelopData.unwrap();
+    let develop_data = (*G_P_IFACE).DevelopData.unwrap();
     let base64_encode = (*G_P_IFACE).BASE64Encode.unwrap();
-    let ctx_verify_data_internal = (*G_P_IFACE).CtxVerifyDataInternal.unwrap();
+    let verify_data_internal = (*G_P_IFACE).VerifyDataInternal.unwrap();
     let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
 
-    let mut err: c_ulong;
+    let mut err;
 
     // 2) Decode Sender cert
-    let mut pbSenderCert: *mut c_uchar = ptr::null_mut();
-    let mut dwSenderCertLength: c_ulong = 0;
+    let mut pbSenderCert = ptr::null_mut();
+    let mut dwSenderCertLength = 0;
     {
         let c_sender_cert = CString::new(state.encryption_cert.as_bytes()).unwrap();
         err = base64_decode(
             c_sender_cert.as_ptr() as *mut c_char,
-            &mut pbSenderCert as *mut _,
-            &mut dwSenderCertLength as *mut _,
+            &mut pbSenderCert,
+            &mut dwSenderCertLength,
         );
         if err != EU_ERROR_NONE as c_ulong {
             return Err(EUSignError(err));
@@ -1153,14 +1144,14 @@ pub unsafe fn decrypt_customer_data(
     }
 
     // 3) Decode Customer Crypto
-    let mut pbCustomerCrypto: *mut c_uchar = ptr::null_mut();
-    let mut dwCustomerCryptoLength: c_ulong = 0;
+    let mut pbCustomerCrypto = ptr::null_mut();
+    let mut dwCustomerCryptoLength = 0;
     {
         let c_customer_crypto = CString::new(pszCustomerCrypto).unwrap();
         err = base64_decode(
             c_customer_crypto.as_ptr() as *mut c_char,
-            &mut pbCustomerCrypto as *mut _,
-            &mut dwCustomerCryptoLength as *mut _,
+            &mut pbCustomerCrypto,
+            &mut dwCustomerCryptoLength,
         );
         if err != EU_ERROR_NONE as c_ulong {
             free_memory(pbSenderCert);
@@ -1169,18 +1160,15 @@ pub unsafe fn decrypt_customer_data(
     }
 
     // 4) Develop data
-    let mut pbDecryptedCustomerData: *mut c_uchar = ptr::null_mut();
-    let mut dwDecryptedCustomerLength: c_ulong = 0;
+    let mut pbDecryptedCustomerData = ptr::null_mut();
+    let mut dwDecryptedCustomerLength = 0;
 
-    err = ctx_develop_data(
-        state.ctx.key_ctx as *mut c_void, // This is safe, since docs and developers say that here key context will not change.
+    err = develop_data(
         ptr::null_mut(),
         pbCustomerCrypto,
         dwCustomerCryptoLength,
-        ptr::null_mut(),
-        0,
-        &mut pbDecryptedCustomerData as *mut _,
-        &mut dwDecryptedCustomerLength as *mut _,
+        &mut pbDecryptedCustomerData,
+        &mut dwDecryptedCustomerLength,
         &mut pSenderInfo,
     );
     if err != EU_ERROR_NONE as c_ulong {
@@ -1194,11 +1182,11 @@ pub unsafe fn decrypt_customer_data(
     free_memory(pbSenderCert);
 
     // 5) Re-sign data to verify
-    let mut developedSign: *mut c_char = ptr::null_mut();
+    let mut developedSign = ptr::null_mut();
     err = base64_encode(
         pbDecryptedCustomerData,
         dwDecryptedCustomerLength,
-        &mut developedSign as *mut _,
+        &mut developedSign,
     );
     if err != EU_ERROR_NONE as c_ulong {
         free_memory(pbDecryptedCustomerData);
@@ -1206,9 +1194,8 @@ pub unsafe fn decrypt_customer_data(
     }
 
     // 6) Verify signature
-    err = ctx_verify_data_internal(
-        state.ctx.lib_ctx as *mut c_void,
-        0,
+    err = verify_data_internal(
+        ptr::null_mut(),
         pbDecryptedCustomerData,
         dwDecryptedCustomerLength,
         &mut ppbCustomerData,
@@ -1247,8 +1234,8 @@ pub unsafe fn decrypt_customer_data(
     // free sign info, sender info, etc.
     let free_sign_info = (*G_P_IFACE).FreeSignInfo.unwrap();
     let free_sender_info = (*G_P_IFACE).FreeSenderInfo.unwrap();
-    free_sign_info(&mut pSignInfo as *mut _);
-    free_sender_info(&mut pSenderInfo as *mut _);
+    free_sign_info(&mut pSignInfo);
+    free_sender_info(&mut pSenderInfo);
 
     Ok(customerData)
 }

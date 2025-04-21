@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ptr::null_mut, sync::Arc};
 
 use anyhow::anyhow;
 use axum::{
@@ -22,7 +22,7 @@ use crate::{
     commands::server::ServerState,
     utils::{
         cache::AgreementProposalKey,
-        eusign::{EU_CTX_HASH_ALGO_SHA256, EU_ERROR_NONE, G_P_IFACE},
+        eusign::{EU_ERROR_NONE, G_P_IFACE},
         s3::get_agreement_pdf,
         server_error::{EUSignError, ServerError},
         verify_jwt::verify_jwt,
@@ -152,16 +152,13 @@ pub async fn handler(
             let mut hash = std::ptr::null_mut();
             let mut hash_len = 0;
     
-            let ctx_hash_data = (*G_P_IFACE)
-                .CtxHashData
+            let hash_data = (*G_P_IFACE)
+                .HashData
                 .ok_or(anyhow!("EUSign missing CtxHashData"))?;
-            let err = ctx_hash_data(
-                state.ctx.lib_ctx as *mut std::ffi::c_void,
-                EU_CTX_HASH_ALGO_SHA256.into(),
-                std::ptr::null_mut(),
-                0,
+            let err = hash_data(
                 pdf.as_mut_ptr(),
                 pdf.len().try_into()?,
+                null_mut(),
                 &mut hash,
                 &mut hash_len,
             );
@@ -174,10 +171,10 @@ pub async fn handler(
             let rust_bytes = slice.to_vec();
     
             // 3) Free the C++ buffer with the proper free call
-            let ctx_free = (*G_P_IFACE)
-                .CtxFreeMemory
+            let free_memory = (*G_P_IFACE)
+                .FreeMemory
                 .ok_or(anyhow!("EUSign missing CtxFreeMemory"))?;
-            ctx_free(state.ctx.lib_ctx as *mut std::ffi::c_void, hash);
+            free_memory(hash);
     
             // 4) Base64‑encode and return
             STANDARD.encode(&rust_bytes)
