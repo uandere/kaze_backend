@@ -2639,6 +2639,7 @@ dependencies = [
  "rustls 0.23.25",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "tar",
  "thiserror 2.0.12",
