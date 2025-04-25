@@ -22,9 +22,7 @@ use uuid::Uuid;
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::AgreementProposalKey,
-        s3::get_agreement_pdf,
-        server_error::ServerError,
+        cache::AgreementProposalKey, s3::get_agreement_pdf, server_error::ServerError,
         verify_jwt::verify_jwt,
     },
 };
@@ -147,36 +145,10 @@ pub async fn handler(
 
     // generating the hash
     let base64_hash = {
-        // unsafe {
-            // 1) Call into EUSign to get a new[]‐allocated buffer + length
-            // let mut hash = std::ptr::null_mut();
-            // let mut hash_len = 0;
-
-            // let err = EUHashData(
-            //     pdf.as_mut_ptr(),
-            //     pdf.len().try_into()?,
-            //     null_mut(),
-            //     &mut hash,
-            //     &mut hash_len,
-            // );
-            // if err as u32 != EU_ERROR_NONE {
-            //     return Err(EUSignError(err).into());
-            // }
-
-            let mut hasher = Sha256::new();
-            hasher.update(pdf);
-            let rust_bytes = hasher.finalize().to_vec();
-
-            // // 2) Copy into a Rust Vec<u8>
-            // let slice = std::slice::from_raw_parts(hash, hash_len as usize);
-            // let rust_bytes = slice.to_vec();
-
-            // // 3) Free the C++ buffer with the proper free call
-            // EUFreeMemory(hash);
-
-            // 4) Base64‑encode and return
-            STANDARD.encode(&rust_bytes)
-        // }
+        let mut hasher = Sha256::new();
+        hasher.update(pdf);
+        let rust_bytes = hasher.finalize().to_vec();
+        STANDARD.encode(&rust_bytes)
     };
 
     let request_id = SignHashRequestId {
