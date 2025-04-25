@@ -10,3 +10,4 @@ libs/eusign/pkey
 libs/eusign/certificates
 mockup_users
 checkpoint/*
+*.DS_Store*
