@@ -8,12 +8,10 @@ export const options = {
             executor: 'ramping-vus',            // classic stage-based executor :contentReference[oaicite:2]{index=2}
             startVUs: 0,
             stages: [
-                { duration: '1m', target: 25 },
+                { duration: '30s', target: 25 },
                 { duration: '1m', target: 150 },
-                { duration: '1m', target: 350 },
-                { duration: '1m', target: 600 },
-                { duration: '1m', target: 350 },
-                { duration: '1m', target: 150 },
+                { duration: '1m', target: 300 },
+                { duration: '1m', target: 100 },
                 { duration: '30s', target: 0 },
             ],
         },
