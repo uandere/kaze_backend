@@ -105,8 +105,6 @@ pub async fn handler(
         )
         .await?;
 
-    
-
         // 3. Updating the cache (changing tenant_signed or landlord_singed)
         state
             .cache
@@ -118,16 +116,7 @@ pub async fn handler(
             .and_compute_with(|entry| {
                 let op = match entry {
                     Some(entry) => {
-                        // TODO: remove this ===================================
-                        if signed_by == tenant_id && signed_by == landlord_id {
-                            Op::Put(Arc::new(AgreementProposalValue {
-                                tenant_signed: true,
-                                landlord_signed: true,
-                                ..*entry.into_value().as_ref()
-                            }))
-                        }
-                        // TODO: remove this ===================================
-                        else if signed_by == tenant_id {
+                        if signed_by == tenant_id {
                             Op::Put(Arc::new(AgreementProposalValue {
                                 tenant_signed: true,
                                 ..*entry.into_value().as_ref()
