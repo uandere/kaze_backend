@@ -41,9 +41,7 @@ impl IntoResponse for ServerError {
     fn into_response(self) -> axum::response::Response {
         match self {
             ServerError::BadRequest(msg) => json(StatusCode::BAD_REQUEST, "bad_request", msg),
-            ServerError::Unauthorized(msg) => {
-                json(StatusCode::UNAUTHORIZED, "unauthorized", msg)
-            }
+            ServerError::Unauthorized(msg) => json(StatusCode::UNAUTHORIZED, "unauthorized", msg),
             ServerError::NotFound(msg) => json(StatusCode::NOT_FOUND, "not_found", msg),
             ServerError::Conflict(msg) => json(StatusCode::CONFLICT, "conflict", msg),
             ServerError::Eusign(err) => {

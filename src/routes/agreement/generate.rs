@@ -41,6 +41,7 @@ pub struct Payload {
     pub ownership_data: OwneshipData,
 
     /// This is a backdoor for testing purposes
+    #[cfg(feature = "dev")]
     pub _uid: Option<String>,
 }
 
@@ -53,9 +54,16 @@ pub async fn handler(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<Payload>,
 ) -> Result<Json<Response>, ServerError> {
+    #[cfg(feature = "dev")]
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
+    #[cfg(feature = "default")]
+    let uid = {
         let token = bearer.token();
         verify_jwt(token, &state).await?
     };

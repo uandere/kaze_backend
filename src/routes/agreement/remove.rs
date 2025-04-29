@@ -32,6 +32,7 @@ pub struct RemoveAgreementPayload {
     pub housing_id: String,
 
     /// backdoor for testing
+    #[cfg(feature = "dev")]
     pub _uid: Option<String>,
 }
 
@@ -50,18 +51,26 @@ pub async fn handler(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Json(payload): Json<RemoveAgreementPayload>,
 ) -> Result<Response, ServerError> {
-    // 1) figure out who is calling
+    #[cfg(feature = "dev")]
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
-        verify_jwt(bearer.token(), &state).await?
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
+    #[cfg(feature = "default")]
+    let uid = {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
     };
 
     // 2) check that the caller is either the tenant or landlord
     if uid != payload.tenant_id && uid != payload.landlord_id {
         return Err(anyhow!(
             "you are not authorized to remove this agreement: you're not a landlord or a tenant"
-        ).into());
+        )
+        .into());
     }
 
     // 3) remove from DB
@@ -84,12 +93,14 @@ pub async fn handler(
     )
     .await?;
 
-    // (If you have a `CACHE`, and you want to remove from cache as well):
-    state.cache.invalidate(&AgreementProposalKey {
-        tenant_id: payload.tenant_id.clone(),
-        landlord_id: payload.landlord_id.clone(),
-        housing_id: payload.housing_id.clone(),
-    }).await;
+    state
+        .cache
+        .invalidate(&AgreementProposalKey {
+            tenant_id: payload.tenant_id.clone(),
+            landlord_id: payload.landlord_id.clone(),
+            housing_id: payload.housing_id.clone(),
+        })
+        .await;
 
     // 4) remove from S3
     let pdf_key = get_key_for_s3(Arc::new(AgreementProposalKey {
@@ -125,5 +136,9 @@ pub async fn handler(
         .await;
 
     // 5) respond with success
-    Ok((StatusCode::OK, Json(RemoveAgreementResponse { success: true })).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(RemoveAgreementResponse { success: true }),
+    )
+        .into_response())
 }

@@ -3,9 +3,13 @@ use crate::{
     utils::{db, server_error::ServerError, verify_jwt::verify_jwt},
 };
 use axum::{
-    extract::{Query, State},
+    extract::State,
     Json,
 };
+
+#[cfg(feature = "dev")]
+use axum::extract::Query;
+
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -15,6 +19,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct Payload {
     /// This is a backdoor for testing purposes
+    #[cfg(feature = "dev")]
     pub _uid: Option<String>,
 }
 
@@ -27,11 +32,18 @@ pub struct Response {
 pub async fn handler(
     State(state): State<ServerState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
-    Query(payload): Query<Payload>,
+    #[cfg(feature = "dev")] Query(payload): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
+    #[cfg(feature = "dev")]
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
+    #[cfg(feature = "default")]
+    let uid = {
         let token = bearer.token();
         verify_jwt(token, &state).await?
     };

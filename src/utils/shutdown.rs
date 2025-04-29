@@ -40,13 +40,13 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
 
     info!("sending graceful shutdown signal");
 
-    // Free the EUSign library
-    unsafe {
-        EUUnload();
-    }
-
     // Saving the cache into the file for now
     save_cache_to_a_file(CACHE_SAVE_LOCATION_DEFAULT, state.cache).await;
 
     handle.graceful_shutdown(Some(Duration::from_secs(10)));
+
+    // Free the EUSign library
+    unsafe {
+        EUUnload();
+    }
 }

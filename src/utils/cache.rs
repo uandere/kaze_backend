@@ -149,28 +149,21 @@ pub async fn populate_cache_from_file(
         return Err(anyhow!(
             "ERROR: UNABLE TO LOAD CACHE. FILE NOT FOUND: {} OR DEFAULT",
             cache_file_location
-        ).into());
+        )
+        .into());
     };
 
     if let Some(mut file) = file_to_load_cache {
         // Read the file contents
         let mut contents = String::new();
         if let Err(e) = file.read_to_string(&mut contents).await {
-            return Err(anyhow!(
-                "ERROR: UNABLE TO READ CACHE FILE. ERROR: {}",
-                e
-            ).into());
+            return Err(anyhow!("ERROR: UNABLE TO READ CACHE FILE. ERROR: {}", e).into());
         }
 
         // Deserialize JSON content
         let saved_cache: SavedChallengeCache = match serde_json::from_str(&contents) {
             Ok(data) => data,
-            Err(e) => {
-                return Err(anyhow!(
-                    "ERROR: INVALID CACHE FILE FORMAT. ERROR: {}",
-                    e
-                ).into())
-            }
+            Err(e) => return Err(anyhow!("ERROR: INVALID CACHE FILE FORMAT. ERROR: {}", e).into()),
         };
 
         // Populate the cache
@@ -181,9 +174,7 @@ pub async fn populate_cache_from_file(
         info!("CACHE IMPORTED SUCCESSFULLY",);
         Ok(())
     } else {
-        Err(anyhow!(
-            "ERROR: UNABLE TO LOAD CACHE FILE.".to_string()
-        ).into())
+        Err(anyhow!("ERROR: UNABLE TO LOAD CACHE FILE.".to_string()).into())
     }
 }
 

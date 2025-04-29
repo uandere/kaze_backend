@@ -24,9 +24,9 @@ pub async fn handler(
     payload: Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
     match db::get_document_unit_from_db(&state.db_pool, &payload.id).await {
-        Ok(doc) => Ok(Json(Response { name: doc.internal_passport.first_name_ua.clone() })),
-        Err(_) => {
-            Err(anyhow!("user is not authorized with Diia").into())
-        },
+        Ok(doc) => Ok(Json(Response {
+            name: doc.internal_passport.first_name_ua.clone(),
+        })),
+        Err(_) => Err(anyhow!("user is not authorized with Diia").into()),
     }
 }

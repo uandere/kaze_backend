@@ -59,7 +59,6 @@ impl Default for EU_ENVELOP_INFO {
     }
 }
 
-
 /// Load the EUSign library.
 /// # Safety
 /// This function is inherently unsafe.
@@ -129,7 +128,6 @@ pub unsafe fn get_error_message(dwError: c_ulong) -> String {
     // Convert from C-string
     let msg = CStr::from_ptr(c_ptr).to_string_lossy().into_owned();
     msg
-
 }
 
 /// Parse a JSON string containing an array of CASettings.
@@ -153,7 +151,6 @@ pub unsafe fn Initialize(config: Config) -> Result<(), EUSignError> {
         warn!("{}", get_error_message(dwError));
         return Err(EUSignError(dwError));
     }
-
 
     let nSaveSettings: c_int = EU_SETTINGS_ID_NONE as c_int;
     let nSign = EU_SIGN_TYPE_CADES_T;

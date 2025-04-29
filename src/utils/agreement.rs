@@ -840,7 +840,10 @@ pub struct OwneshipData {
 
 impl Default for OwneshipData {
     fn default() -> Self {
-        Self { record_number: "012345678".into(), date: Utc::now().naive_local() }
+        Self {
+            record_number: "012345678".into(),
+            date: Utc::now().naive_local(),
+        }
     }
 }
 
@@ -1004,7 +1007,15 @@ pub async fn generate(
     let additional_property = rent_data
         .additional_property
         .into_iter()
-        .map(|val| (val.name, AdditionalPropertyValue { uah_price: val.uah_price, amount: val.amount }))
+        .map(|val| {
+            (
+                val.name,
+                AdditionalPropertyValue {
+                    uah_price: val.uah_price,
+                    amount: val.amount,
+                },
+            )
+        })
         .collect::<HashMap<_, _>>();
 
     let fun_appendix_one = AppendixOne {

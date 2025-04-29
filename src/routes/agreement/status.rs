@@ -91,7 +91,8 @@ pub async fn handler(
 
     // if the agreement is in the database, changing the status to Signed
     if let Some(date) = date {
-        let agreement = get_agreement(&state.db_pool, &tenant_id, &landlord_id, &housing_id, &date).await;
+        let agreement =
+            get_agreement(&state.db_pool, &tenant_id, &landlord_id, &housing_id, &date).await;
         if let Ok(Some(_)) = agreement {
             status = AgreementStatus::Signed;
         }

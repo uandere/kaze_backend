@@ -22,6 +22,8 @@ pub struct Payload {
     pub tenant_id: String,
     pub landlord_id: String,
     pub housing_id: String,
+
+    #[cfg(feature = "dev")]
     pub _uid: Option<String>,
 }
 
@@ -31,9 +33,16 @@ pub async fn handler(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     Query(payload): Query<Payload>,
 ) -> Result<Response, ServerError> {
+    #[cfg(feature = "dev")]
     let uid = if let Some(_uid) = payload._uid {
         _uid
     } else {
+        let token = bearer.token();
+        verify_jwt(token, &state).await?
+    };
+
+    #[cfg(feature = "default")]
+    let uid = {
         let token = bearer.token();
         verify_jwt(token, &state).await?
     };
