@@ -201,7 +201,7 @@ pub async fn save_cache_to_a_file(cache_save_location: &str, cache: AgreementPro
     };
 
     if let Some(mut file) = file_to_save_cache {
-        // Create a vector of entries instead of a HashMap
+        // saving as a vector of entries
         let mut entries = Vec::new();
         for elem in cache.iter() {
             entries.push(CacheEntry {

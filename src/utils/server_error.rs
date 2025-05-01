@@ -19,8 +19,7 @@ struct ErrorResponse {
 /// Top‑level error type used throughout the code‑base.
 ///
 /// Anything that implements `Into<anyhow::Error>` can be converted into
-/// `ServerError` via the blanket `From` implementation at the bottom – this is
-/// what enables the ubiquitous `?` operator.
+/// `ServerError` via the blanket `From` implementation at the bottom.
 #[derive(Debug)]
 pub enum ServerError {
     /// 400 – the caller provided invalid data.

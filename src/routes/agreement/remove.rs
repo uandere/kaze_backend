@@ -65,7 +65,7 @@ pub async fn handler(
         verify_jwt(token, &state).await?
     };
 
-    // 2) check that the caller is either the tenant or landlord
+    // check that the caller is either the tenant or landlord
     if uid != payload.tenant_id && uid != payload.landlord_id {
         return Err(anyhow!(
             "you are not authorized to remove this agreement: you're not a landlord or a tenant"
@@ -73,7 +73,7 @@ pub async fn handler(
         .into());
     }
 
-    // 3) remove from DB
+    // remove from DB
     //   - remove the row in `agreements` table
     //   - remove the row in `signatures` table
     //     (and return the removed signature if it existed)
@@ -102,7 +102,7 @@ pub async fn handler(
         })
         .await;
 
-    // 4) remove from S3
+    // removing from S3
     let pdf_key = get_key_for_s3(Arc::new(AgreementProposalKey {
         tenant_id: payload.tenant_id.clone(),
         landlord_id: payload.landlord_id.clone(),
@@ -135,7 +135,6 @@ pub async fn handler(
         .send()
         .await;
 
-    // 5) respond with success
     Ok((
         StatusCode::OK,
         Json(RemoveAgreementResponse { success: true }),

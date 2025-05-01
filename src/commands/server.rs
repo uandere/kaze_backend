@@ -87,16 +87,13 @@ pub fn run(
         let aws_sm_client = aws_sdk_secretsmanager::Client::new(&aws_config);
         let aws_s3_client = aws_sdk_s3::Client::new(&aws_config);
 
-        // Retrieve DB password from Secrets Manager
         let db_secret = get_secret(&aws_sm_client, &db_secret_name)
             .await
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve database secret"))?;
 
-        // Parse the JSON secret
         let db_config: DatabaseConfig = serde_json::from_str(&db_secret)
             .map_err(|e| anyhow::anyhow!("Failed to parse database secret: {}", e))?;
 
-        // Initialize database connection
         let db_pool = init_db_pool(
             &db_config.host,
             db_config.port,
@@ -113,7 +110,6 @@ pub fn run(
         let (signature_request_sender, mut signature_request_receiver) =
             tokio::sync::mpsc::unbounded_channel();
 
-        // We'll keep the cache for compatibility, but gradually transition to DB
         let cache = build_cache(Arc::new(db_pool.clone()), signature_request_sender);
         populate_cache_from_file(CACHE_SAVE_LOCATION_DEFAULT, &cache).await?;
 
