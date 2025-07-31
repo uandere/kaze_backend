@@ -19,7 +19,7 @@ pub enum TypstSerError {
 impl std::fmt::Display for TypstSerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypstSerError::Message(msg) => write!(f, "{}", msg),
+            TypstSerError::Message(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -449,7 +449,7 @@ impl Serialize for TypstDateTime {
         let year = self.0.year();
         // We'll store as "datetime(day: X, month: Y, year: Z)" in quotes,
         // then do a .replace(...) to remove them.
-        let s = format!("datetime(day: {}, month: {}, year: {})", day, month, year);
+        let s = format!("datetime(day: {day}, month: {month}, year: {year})");
         serializer.serialize_str(&s)
     }
 }

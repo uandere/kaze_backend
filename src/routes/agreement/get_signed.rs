@@ -11,20 +11,21 @@ use axum_extra::{
 };
 use http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
     commands::server::ServerState,
-    utils::{cache::AgreementProposalKey, s3, server_error::ServerError, verify_jwt::verify_jwt},
+    utils::{s3, server_error::ServerError, verify_jwt::verify_jwt},
 };
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct Payload {
-    pub tenant_id: String,
-    pub landlord_id: String,
-    pub housing_id: String,
+    pub tenant_id: Uuid,
+    pub landlord_id: Uuid,
+    pub housing_id: Uuid,
 
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 /// Retuns the data about the latest rental ageement between tenant and landlord.
@@ -54,15 +55,9 @@ pub async fn handler(
         .into());
     }
 
-    let key = Arc::new(AgreementProposalKey {
-        tenant_id: payload.tenant_id.clone(),
-        landlord_id: payload.landlord_id.clone(),
-        housing_id: payload.housing_id.clone(),
-    });
+    let pdf_signed = s3::get_agreement_ps7(&state, payload.tenant_id, payload.landlord_id, payload.housing_id).await?;
 
-    let pdf_signed = s3::get_agreement_ps7(&state, key.clone()).await?;
-
-    let filename = s3::get_signature_key_for_s3(key);
+    let filename = s3::get_signature_key_for_s3(payload.tenant_id, payload.landlord_id, payload.housing_id);
 
     let response = Response::builder()
         .status(StatusCode::OK)

@@ -42,7 +42,7 @@ pub struct Payload {
 
     /// This is a backdoor for testing purposes
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 #[derive(Serialize)]

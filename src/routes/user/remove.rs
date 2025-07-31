@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct Payload {
     /// This is a backdoor for testing purposes
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 #[derive(Serialize)]
@@ -48,7 +48,7 @@ pub async fn handler(
         verify_jwt(token, &state).await?
     };
 
-    if (db::delete_document_unit(&state.db_pool, &uid).await).is_ok() {
+    if (db::delete_document_unit(&state.db_pool, uid).await).is_ok() {
         Ok(Json(Response { success: true }))
     } else {
         Ok(Json(Response { success: false }))

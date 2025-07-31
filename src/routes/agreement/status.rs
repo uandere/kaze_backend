@@ -4,26 +4,27 @@ use axum::{
 };
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::AgreementProposalKey,
         db::{get_agreement, get_agreements_for_tenant_and_landlord},
         server_error::ServerError,
     },
 };
 
 /// Represents the status of the agreement.
+/// This structure is intended to be read by the frontend.
 #[derive(Serialize)]
 pub enum AgreementStatus {
     NotInitiated,
-    Initiated { confirmed_by: String },
-    Rejected,
+    Initiated { by: Uuid },
+    Rejected {by: Uuid},
     Generated,
-    HalfSigned { signed_by: String },
+    HalfSigned { by: Uuid },
     Signed,
-    Expired { timestamp: chrono::NaiveDate },
+
 }
 
 #[derive(Deserialize)]
@@ -50,64 +51,6 @@ pub async fn handler(
         date,
     }): Query<Payload>,
 ) -> Result<Json<Response>, ServerError> {
-    let mut status = AgreementStatus::NotInitiated;
-
-    // if the agreement is in the cache - upgrading status to Initiated / Generated / HalfSigned
-    if let Some(val) = state
-        .cache
-        .get(&AgreementProposalKey {
-            tenant_id: tenant_id.clone(),
-            landlord_id: landlord_id.clone(),
-            housing_id: housing_id.clone(),
-        })
-        .await
-    {
-        if val.landlord_confirmed || val.tenant_confirmed {
-            if val.landlord_confirmed && val.tenant_confirmed {
-                status = AgreementStatus::Generated;
-            } else if val.landlord_confirmed {
-                status = AgreementStatus::Initiated {
-                    confirmed_by: landlord_id.clone(),
-                }
-            } else {
-                status = AgreementStatus::Initiated {
-                    confirmed_by: tenant_id.clone(),
-                }
-            }
-        }
-
-        if val.landlord_signed || val.tenant_signed {
-            if val.landlord_signed {
-                status = AgreementStatus::HalfSigned {
-                    signed_by: landlord_id.clone(),
-                };
-            } else {
-                status = AgreementStatus::HalfSigned {
-                    signed_by: tenant_id.clone(),
-                };
-            }
-        }
-    }
-
-    // if the agreement is in the database, changing the status to Signed
-    if let Some(date) = date {
-        let agreement =
-            get_agreement(&state.db_pool, &tenant_id, &landlord_id, &housing_id, &date).await;
-        if let Ok(Some(_)) = agreement {
-            status = AgreementStatus::Signed;
-        }
-    } else {
-        // checking the latest one
-        let agreements = get_agreements_for_tenant_and_landlord(
-            &state.db_pool,
-            &tenant_id.clone(),
-            &landlord_id.clone(),
-        )
-        .await?;
-        if !agreements.is_empty() {
-            status = AgreementStatus::Signed;
-        }
-    }
-
-    Ok(Json(Response { status }))
+    // TODO: getting the status from the DB column
+    todo!()
 }

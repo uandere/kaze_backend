@@ -1,7 +1,6 @@
 use std::{
     ffi::c_ulong,
     ptr::{self, null_mut},
-    sync::Arc,
 };
 
 use anyhow::{anyhow, Context};
@@ -14,7 +13,6 @@ use serde::Deserialize;
 use tracing::info;
 
 use super::{
-    cache::AgreementProposalKey,
     db::SignatureEntry,
     eusign::*,
     s3::{get_agreement_pdf, upload_agreement_p7s},
@@ -73,11 +71,7 @@ pub async fn diia_signature_handler(
     // 1) fetch the PDF
     let mut pdf = get_agreement_pdf(
         &state,
-        Arc::new(AgreementProposalKey {
-            tenant_id: tenant_id.clone(),
-            landlord_id: landlord_id.clone(),
-            housing_id: housing_id.clone(),
-        }),
+        tenant_id, landlord_id, housing_id,
     )
     .await?;
     let pdf_data = pdf.as_mut_ptr();
@@ -294,11 +288,9 @@ pub async fn diia_signature_handler(
         upload_agreement_p7s(
             &state,
             out,
-            Arc::new(AgreementProposalKey {
-                tenant_id,
-                landlord_id,
-                housing_id,
-            }),
+            tenant_id,
+            landlord_id,
+            housing_id,
         )
         .await?;
     }

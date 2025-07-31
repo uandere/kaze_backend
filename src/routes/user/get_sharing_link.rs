@@ -27,7 +27,7 @@ use uuid::Uuid;
 pub struct Payload {
     /// This is a backdoor for testing purposes
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 #[derive(Serialize)]
@@ -37,7 +37,7 @@ pub struct Response {
 
 #[derive(Serialize, Deserialize)]
 pub struct DiiaSharingRequestId {
-    pub uid: String,
+    pub uid: Uuid,
     pub seed: Uuid,
 }
 
@@ -105,7 +105,7 @@ pub async fn handler(
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(
         AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", token))?,
+        HeaderValue::from_str(&format!("Bearer {token}"))?,
     );
 
     // sending the request with better error handling

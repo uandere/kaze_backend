@@ -7,7 +7,6 @@ use tracing::info;
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::{save_cache_to_a_file, CACHE_SAVE_LOCATION_DEFAULT},
         eusign::EUUnload,
     },
 };
@@ -15,7 +14,7 @@ use crate::{
 /// This function is used for graceful shutdown.
 /// Probably should be replaced with something more robust.
 /// It was decided to panic in case we were unable to install a signal handler.
-pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
+pub async fn graceful_shutdown(handle: Handle, _state: ServerState) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -39,9 +38,6 @@ pub async fn graceful_shutdown(handle: Handle, state: ServerState) {
     }
 
     info!("sending graceful shutdown signal");
-
-    // Saving the cache into the file for now
-    save_cache_to_a_file(CACHE_SAVE_LOCATION_DEFAULT, state.cache).await;
 
     handle.graceful_shutdown(Some(Duration::from_secs(10)));
 

@@ -1,10 +1,9 @@
-use std::{str::from_utf8, sync::Arc};
+use std::str::from_utf8;
 
 use crate::{
     commands::server::ServerState,
     routes::agreement::get_sign_link::SignHashRequestId,
     utils::{
-        cache::{AgreementProposalKey, AgreementProposalValue},
         db,
         server_error::ServerError,
     },
@@ -13,7 +12,6 @@ use anyhow::{anyhow, Context};
 use axum::extract::{Json, Multipart, State};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use http::HeaderMap;
-use moka::ops::compute::Op;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -95,57 +93,19 @@ pub async fn handler(
             .signature;
 
         // 2. Updating signatures DB
-        db::add_signature(
+        db::persist_signature(
             &state.db_pool,
-            &tenant_id,
-            &landlord_id,
-            &housing_id,
-            &signed_by,
-            signature,
+            tenant_id,
+            landlord_id,
+            housing_id,
+            signed_by,
+            signature
         )
         .await?;
 
-        // 3. Updating the cache (changing tenant_signed or landlord_singed)
-        state
-            .cache
-            .entry(AgreementProposalKey {
-                tenant_id: tenant_id.clone(),
-                landlord_id: landlord_id.clone(),
-                housing_id: housing_id.clone(),
-            })
-            .and_compute_with(|entry| {
-                let op = match entry {
-                    Some(entry) => {
-                        if signed_by == tenant_id {
-                            Op::Put(Arc::new(AgreementProposalValue {
-                                tenant_signed: true,
-                                ..*entry.into_value().as_ref()
-                            }))
-                        } else {
-                            Op::Put(Arc::new(AgreementProposalValue {
-                                landlord_signed: true,
-                                ..*entry.into_value().as_ref()
-                            }))
-                        }
-                    }
-                    None => {
-                        if signed_by == tenant_id {
-                            Op::Put(Arc::new(AgreementProposalValue {
-                                tenant_signed: true,
-                                ..Default::default()
-                            }))
-                        } else {
-                            Op::Put(Arc::new(AgreementProposalValue {
-                                landlord_signed: true,
-                                ..Default::default()
-                            }))
-                        }
-                    }
-                };
-
-                std::future::ready(op)
-            })
-            .await;
+        // 3. Updating the DB (changing tenant_signed or landlord_singed)
+        // TODO
+        
     }
 
     Ok(Json(Response { success: true }))

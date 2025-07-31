@@ -12,12 +12,12 @@ use axum_extra::{
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::info;
+use uuid::Uuid;
 
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::AgreementProposalKey,
-        db::{delete_latest_agreement, remove_signature_entry},
+        db::{delete_latest_agreement},
         s3::{get_key_for_s3, get_signature_key_for_s3},
         server_error::ServerError,
         verify_jwt::verify_jwt,
@@ -27,13 +27,13 @@ use crate::{
 /// The input payload to remove an agreement
 #[derive(Deserialize)]
 pub struct RemoveAgreementPayload {
-    pub tenant_id: String,
-    pub landlord_id: String,
-    pub housing_id: String,
+    pub tenant_id: Uuid,
+    pub landlord_id: Uuid,
+    pub housing_id: Uuid,
 
     /// backdoor for testing
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 /// Response for `remove_agreement` endpoint
@@ -79,41 +79,32 @@ pub async fn handler(
     //     (and return the removed signature if it existed)
     let _deleted_agreement = delete_latest_agreement(
         &state.db_pool,
-        &payload.tenant_id,
-        &payload.landlord_id,
-        &payload.housing_id,
+        payload.tenant_id,
+        payload.landlord_id,
+        payload.housing_id,
     )
     .await?;
 
     let _removed_signatures = remove_signature_entry(
         &state.db_pool,
-        &payload.tenant_id,
-        &payload.landlord_id,
-        &payload.housing_id,
+        payload.tenant_id,
+        payload.landlord_id,
+        payload.housing_id,
     )
     .await?;
 
-    state
-        .cache
-        .invalidate(&AgreementProposalKey {
-            tenant_id: payload.tenant_id.clone(),
-            landlord_id: payload.landlord_id.clone(),
-            housing_id: payload.housing_id.clone(),
-        })
-        .await;
-
     // removing from S3
-    let pdf_key = get_key_for_s3(Arc::new(AgreementProposalKey {
-        tenant_id: payload.tenant_id.clone(),
-        landlord_id: payload.landlord_id.clone(),
-        housing_id: payload.housing_id.clone(),
-    }));
+    let pdf_key = get_key_for_s3(
+        payload.tenant_id.clone(),
+        payload.landlord_id.clone(),
+        payload.housing_id.clone(),
+    );
 
-    let sig_key = get_signature_key_for_s3(Arc::new(AgreementProposalKey {
-        tenant_id: payload.tenant_id.clone(),
-        landlord_id: payload.landlord_id.clone(),
-        housing_id: payload.housing_id.clone(),
-    }));
+    let sig_key = get_signature_key_for_s3(
+        payload.tenant_id.clone(),
+        payload.landlord_id.clone(),
+        payload.housing_id.clone(),
+    );
 
     info!("Removing from S3: {pdf_key} and {sig_key}");
 

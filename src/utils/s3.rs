@@ -1,17 +1,18 @@
-use std::sync::Arc;
-
 use crate::commands::server::ServerState;
 use anyhow::anyhow;
+use uuid::Uuid;
 
-use super::{cache::AgreementProposalKey, server_error::ServerError};
+use super::server_error::ServerError;
 
 // Uploads agreement PDF to S3
 pub async fn upload_agreement_pdf(
     state: &ServerState,
     body: Vec<u8>,
-    agreement_proposal_key: Arc<AgreementProposalKey>,
+    tenant_id: Uuid,
+    landlord_id: Uuid,
+    housing_id: Uuid,
 ) -> Result<aws_sdk_s3::operation::put_object::PutObjectOutput, ServerError> {
-    let key = get_key_for_s3(agreement_proposal_key);
+    let key = get_key_for_s3(tenant_id, landlord_id, housing_id);
     let body = aws_sdk_s3::primitives::ByteStream::from(body);
     state
         .aws_s3_client
@@ -29,9 +30,11 @@ pub async fn upload_agreement_pdf(
 pub async fn upload_agreement_p7s(
     state: &ServerState,
     body: Vec<u8>,
-    agreement_proposal_key: Arc<AgreementProposalKey>,
+    tenant_id: Uuid,
+    landlord_id: Uuid,
+    housing_id: Uuid,
 ) -> Result<aws_sdk_s3::operation::put_object::PutObjectOutput, ServerError> {
-    let key = get_signature_key_for_s3(agreement_proposal_key);
+    let key = get_signature_key_for_s3(tenant_id, landlord_id, housing_id);
     let body = aws_sdk_s3::primitives::ByteStream::from(body);
     state
         .aws_s3_client
@@ -45,24 +48,31 @@ pub async fn upload_agreement_p7s(
         .map_err(ServerError::from)
 }
 
-pub fn get_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
-    key.tenant_id.clone() + "_" + &key.landlord_id + "_" + &key.housing_id
+pub fn get_key_for_s3(tenant_id: Uuid, landlord_id: Uuid, housing_id: Uuid) -> String {
+    tenant_id.to_string() + "_" + &landlord_id.to_string() + "_" + &housing_id.to_string()
 }
 
-pub fn get_signature_key_for_s3(key: Arc<AgreementProposalKey>) -> String {
-    key.tenant_id.clone() + "_" + &key.landlord_id + "_" + &key.housing_id + "_signed"
+pub fn get_signature_key_for_s3(tenant_id: Uuid, landlord_id: Uuid, housing_id: Uuid) -> String {
+    tenant_id.to_string()
+        + "_"
+        + &landlord_id.to_string()
+        + "_"
+        + &housing_id.to_string()
+        + "_signed"
 }
 
 // Returns a PDF from the S3 bucket
 pub async fn get_agreement_pdf(
     state: &ServerState,
-    agreement_proposal_key: Arc<AgreementProposalKey>,
+    tenant_id: Uuid,
+    landlord_id: Uuid,
+    housing_id: Uuid,
 ) -> Result<Vec<u8>, ServerError> {
     let mut object = state
         .aws_s3_client
         .get_object()
         .bucket(state.s3_bucket_name.clone())
-        .key(get_key_for_s3(agreement_proposal_key))
+        .key(get_key_for_s3(tenant_id, landlord_id, housing_id))
         .send()
         .await?;
 
@@ -83,13 +93,15 @@ pub async fn get_agreement_pdf(
 // Returns a signed PDF from the S3 bucket.
 pub async fn get_agreement_ps7(
     state: &ServerState,
-    agreement_proposal_key: Arc<AgreementProposalKey>,
+    tenant_id: Uuid,
+    landlord_id: Uuid,
+    housing_id: Uuid,
 ) -> Result<Vec<u8>, ServerError> {
     let mut object = state
         .aws_s3_client
         .get_object()
         .bucket(state.s3_bucket_name.clone())
-        .key(get_signature_key_for_s3(agreement_proposal_key))
+        .key(get_signature_key_for_s3(tenant_id, landlord_id, housing_id))
         .send()
         .await?;
 

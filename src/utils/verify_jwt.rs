@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use rs_firebase_admin_sdk::auth::token::TokenVerifier;
 use tracing::*;
+use uuid::Uuid;
 
 use crate::commands::server::ServerState;
 
@@ -20,6 +21,8 @@ async fn verify_token<T: TokenVerifier>(token: &str, verifier: &T) -> Result<Str
     }
 }
 
-pub async fn verify_jwt(token: &str, state: &ServerState) -> Result<String, ServerError> {
-    verify_token(token, state.live_token_verifier.as_ref()).await
+// TODO: THIS SHOULD BE CHANGED TO AWS COGNITO
+pub async fn verify_jwt(token: &str, state: &ServerState) -> Result<Uuid, ServerError> {
+    // verify_token(token, state.live_token_verifier.as_ref()).await
+    todo!()
 }

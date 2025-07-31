@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use axum::{
     extract::{Query, State},
@@ -22,8 +20,7 @@ use uuid::Uuid;
 use crate::{
     commands::server::ServerState,
     utils::{
-        cache::AgreementProposalKey, s3::get_agreement_pdf, server_error::ServerError,
-        verify_jwt::verify_jwt,
+        s3::get_agreement_pdf, server_error::ServerError, verify_jwt::verify_jwt
     },
 };
 
@@ -58,10 +55,10 @@ pub struct SignHashRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct SignHashRequestId {
-    pub tenant_id: String,
-    pub landlord_id: String,
-    pub signed_by: String,
-    pub housing_id: String,
+    pub tenant_id: Uuid,
+    pub landlord_id: Uuid,
+    pub signed_by: Uuid,
+    pub housing_id: Uuid,
     pub seed: Uuid,
 }
 
@@ -72,13 +69,13 @@ struct SignHashResponse {
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct Payload {
-    pub tenant_id: String,
-    pub landlord_id: String,
-    pub housing_id: String,
+    pub tenant_id: Uuid,
+    pub landlord_id: Uuid,
+    pub housing_id: Uuid,
 
     /// This is a backdoor for testing purposes
     #[cfg(feature = "dev")]
-    pub _uid: Option<String>,
+    pub _uid: Option<Uuid>,
 }
 
 #[derive(Serialize)]
@@ -114,40 +111,15 @@ pub async fn handler(
         .into());
     }
 
-    // checking whether users confirmed the generation
-    match state
-        .cache
-        .get(&AgreementProposalKey {
-            tenant_id: payload.tenant_id.clone(),
-            landlord_id: payload.landlord_id.clone(),
-            housing_id: payload.housing_id.clone(),
-        })
-        .await
-    {
-        Some(entry) => {
-            if !(entry.landlord_confirmed && entry.tenant_confirmed) {
-                return Err(anyhow!(
-                    "cannot get a sign link: either tenant or a landlord didn't confirm the generation"
-                )
-                .into());
-            }
-        }
-        None => {
-            return Err(anyhow!(
-                "cannot get a sign link: either tenant or a landlord didn't confirm the generation"
-            )
-            .into());
-        }
-    }
+    // checking whether users confirmed the generation in DB
+    // TODO
 
     // getting the file to generate signed hash
     let pdf = get_agreement_pdf(
         &state,
-        Arc::new(AgreementProposalKey {
-            tenant_id: payload.tenant_id.clone(),
-            landlord_id: payload.landlord_id.clone(),
-            housing_id: payload.housing_id.clone(),
-        }),
+        payload.tenant_id.clone(),
+        payload.landlord_id.clone(),
+        payload.housing_id.clone(),
     )
     .await?;
 
@@ -189,7 +161,7 @@ pub async fn handler(
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(
         AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", token))?,
+        HeaderValue::from_str(&format!("Bearer {token}"))?,
     );
 
     // setting up endpoint
