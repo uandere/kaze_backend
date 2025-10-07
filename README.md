@@ -2,7 +2,8 @@
 
 ## Description
 
-This project is the implementation of the Backend of Kaze project.
+This project is the implementation of the Backend of Renta (previously Kaze)  project - a realtor-free reantal marketplace
+that moves all property management to your phone. It makes use of public registries to automatically handle all the documents needed. 
 
 ## Prerequisites
 
